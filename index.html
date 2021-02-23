@@ -6,7 +6,7 @@
     <style>
       div#fps {
         font-family: 'Courier New', Courier, monospace;
-        font-size: 20px;
+        font-size: 10px;
         position: absolute;
         top: 5px;
         left: 5px;
@@ -15,9 +15,18 @@
     </style>
   </head>
   <body onload="initDemo()" style="margin: 0">
+    
     <canvas id="c"></canvas>
     <div id="fps">
       <span id="fps_value">0</span> fps
+      <label for="dirxL">DirX:</label>
+      <input type="number" id="dirx" name="dirx" value="1.0">
+      <label for="diryL">DirY:</label>
+      <input type="number" id="diry" name="diry" value="0.0">
+      <label for="dirzL">DirZ:</label>
+      <input type="number" id="dirz" name="dirz" value="0.0">
+      <label for="camAngle">CameraAngle:</label>
+      <input type="number" id="cam" name="cam" value="10">
     </div>
 
     <script src="js/gl-matrix.js"></script>

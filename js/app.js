@@ -143,7 +143,7 @@ function initDemo() {
   gl.uniform3f(sphereCenterLocation, 0.0, 2.5, -5.0);
   gl.uniform3f(cubeCenterLocation, 0.0, 2.5, 5.0);
   gl.uniform3f(planePointLocation, 1.0, 3.0, 0.0);
-  gl.uniform3f(planeDirectionLocation, 1.0, -0.5, 0.0);
+  
   gl.uniform1f(floorRadiusLocation, 20.0);
   gl.uniform1f(floorHeightLocation, -1.0);
 
@@ -168,6 +168,14 @@ function initDemo() {
   let fps = 0;
 
   function renderLoop() {
+    var dirx = parseFloat(document.getElementById("dirx").value);
+    var diry = parseFloat(document.getElementById("diry").value);
+    var dirz = parseFloat(document.getElementById("dirz").value);
+    if(dirx != NaN && diry != NaN && dirz != NaN ){
+      gl.uniform3f(planeDirectionLocation, dirx, diry, dirz);
+    }
+    
+
     // resize canvas in case window size has changed
     if (canvas.width !== window.innerWidth
         || canvas.height !== window.innerHeight) {
@@ -177,8 +185,14 @@ function initDemo() {
       ratio = canvas.width / canvas.height;
     }
 
-    const angle = 2 * Math.PI * ((performance.now() / 1000.0) / 6.0);
-    //const angle = Math.PI/4;
+    //const angle = 2 * Math.PI * ((performance.now() / 1000.0) / 6.0);
+    var cam = parseFloat(document.getElementById("cam").value) * (Math.PI/180);
+    var angle;
+    if(cam != NaN ){
+      angle = cam;
+    }else{
+      angle = Math.Pi/4;
+    }
     // Calc new camera position
     vec3.rotateY(cameraPosition, cameraInitialPosition, cameraTo, angle);
 
