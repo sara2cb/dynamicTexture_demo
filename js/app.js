@@ -142,8 +142,8 @@ function initDemo() {
 
   gl.uniform3f(sphereCenterLocation, 0.0, 2.5, -5.0);
   gl.uniform3f(cubeCenterLocation, 0.0, 2.5, 5.0);
-  gl.uniform3f(planePointLocation, 0.0, 0.0, 0.0);
-  gl.uniform3f(planeDirectionLocation, 1.0, 0.0, 0.0);
+  gl.uniform3f(planePointLocation, 1.0, 3.0, 0.0);
+  gl.uniform3f(planeDirectionLocation, 1.0, -0.5, 0.0);
   gl.uniform1f(floorRadiusLocation, 20.0);
   gl.uniform1f(floorHeightLocation, -1.0);
 
@@ -177,8 +177,8 @@ function initDemo() {
       ratio = canvas.width / canvas.height;
     }
 
-    //const angle = 2 * Math.PI * ((performance.now() / 1000.0) / 6.0);
-    const angle = Math.PI/4;
+    const angle = 2 * Math.PI * ((performance.now() / 1000.0) / 6.0);
+    //const angle = Math.PI/4;
     // Calc new camera position
     vec3.rotateY(cameraPosition, cameraInitialPosition, cameraTo, angle);
 

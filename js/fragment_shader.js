@@ -80,10 +80,10 @@ bool intersectPlane(vec3 origin, vec3 rayDirection, out vec3 intersection,
   out vec3 V, out vec3 N, out vec3 L) {
   
   float denom = dot(rayDirection, normalize(norPlane));
-  if(abs(denom) > 0.000001){
+  if(abs(denom) > 0.00001){
     vec3 subs = origPlane - origin;
     float t = dot(subs, normalize(norPlane)) / denom;
-    //ist = t;
+    dist = t;
     if(t<0.0){
       return false;
     }
@@ -223,8 +223,14 @@ bool intersectSomethingGoingToLight(vec3 origin, vec3 N_aux) {
   float dist;
   vec3 V, N, L;
 
-  if (intersectSphere(origin, rayDirection, intersection, dist, V, N, L)
-      || intersectCube(origin, rayDirection, intersection, dist, V, N, L)){
+  bool interCube = intersectCube(origin, rayDirection, intersection, dist, V,N,L) && \
+              !frontPlane(intersection);
+  if (interCube){
+    if (dist < distToLight) return true;
+  }
+  bool interSphere = intersectSphere(origin, rayDirection, intersection, dist, V,N,L) && \
+              !frontPlane(intersection);
+  if (interSphere){
     if (dist < distToLight) return true;
   }
 
@@ -234,46 +240,56 @@ bool intersectSomethingGoingToLight(vec3 origin, vec3 N_aux) {
 bool intersectSomething(vec3 origin, vec3 rayDirection, out vec3 intersection,
                         out vec3 N, out vec3 color, out vec3 reflectedColor,
                         out bool shadow) {
-  float dist1, dist2, dist3;
+  float dist[4];
   vec3 V, L, R;
-  vec3 V2, N2, L2;
-  vec3 intersection2;
-  if (intersectPlane(origin, rayDirection, intersection, dist3, V, N, L) && (insideSphere(intersection) || insideCube(intersection))){
-     
-  }else if (intersectSphere(origin, rayDirection, intersection, dist1, V, N, L)) {
-  //if (intersectSphere(origin, rayDirection, intersection, dist1, V, N, L) && !frontPlane(intersection)) {
-    if (intersectCube(origin, rayDirection, intersection2, dist2, V2, N2, L2)) {
-      if (dist2 < dist1) {
-        intersection = intersection2;
-        V = V2;
-        N = N2;
-        L = L2;
-        reflectedColor = vec3(0.0, 1.0, 0.0);
-      } else {
-        reflectedColor = vec3(1.0, 0.0, 0.0);
-      }
-    } else {
-      reflectedColor = vec3(1.0, 0.0, 0.0);
-    }
-  } else if (intersectCube(origin, rayDirection, intersection, dist1, V, N, L) && !frontPlane(intersection)) {
-    reflectedColor = vec3(0.0, 1.0, 0.0);
-  } else if (intersectFloor(origin, rayDirection, intersection, dist1, V, N, L, reflectedColor)) {
-    reflectedColor = vec3(1.0, 0.0, 1.0);
-  } else {
+  vec3 V2, N2, L2, V3, N3, L3, V4, N4, L4;
+  vec3 Ns[4], Vs[4], Ls[4], Rs[4];
+  vec3 intersection1, intersection2, intersection3;
+  bool interBool[4] ;
+  vec3 inter[4] ;
+
+  interBool[0] = intersectFloor(origin, rayDirection, inter[0], dist[0], Vs[0], Ns[0], Ls[0], reflectedColor); 
+  interBool[1] = intersectPlane(origin, rayDirection, inter[1], dist[1], Vs[1], Ns[1], Ls[1]) && \
+                (insideSphere(inter[1]) || insideCube(inter[1]));
+  interBool[2] = intersectCube(origin, rayDirection, inter[2], dist[2], Vs[2], Ns[2], Ls[2]) && \
+              !frontPlane(inter[2]);
+  interBool[3] = intersectSphere(origin, rayDirection, inter[3], dist[3], Vs[3], Ns[3], Ls[3]) && \
+              !frontPlane(inter[3]);
+
+  if(!interBool[0] && !interBool[1] && !interBool[2] && !interBool[3]){
     return false;
   }
 
+  float minDist = 1000.0;
+  for (int i = 0; i < 4; i++)
+  {
+    if(interBool[i] && (minDist > dist[i])){
+      intersection = inter[i];
+      N = Ns[i];
+      V = Vs[i];
+      L = Ls[i];
+      if(i==0){
+        color = reflectedColor;
+      }else{
+        color = vec3(sin(intersection[0]), cos(2.0*intersection[1]), sin(3.0*intersection[2]));
+        //reflectedColor = vec3(sin(intersection[0]), cos(2.0*intersection[1]), sin(3.0*intersection[2]));
+      }
+      minDist = dist[i];
+    }
+  }
+
+  
   if (intersectSomethingGoingToLight(intersection, N)) {
-    reflectedColor = vec3(0.0, 0.0, 0.0);
-    color = reflectedColor;
+    //reflectedColor = 0.5*color;
+    color = 0.5*color;
     shadow = true;
     return true;
   }
 
   shadow = false;
-  R = reflect(L, N); 
-  color = colorAt(reflectedColor, V, N, L, R);
-  color = vec3(sin(intersection[0]), cos(2.0*intersection[1]), sin(3.0*intersection[2]));
+  //R = reflect(L, N); 
+  //color = colorAt(reflectedColor, V, N, L, R);
+  //color = vec3(sin(intersection[0]), cos(2.0*intersection[1]), sin(3.0*intersection[2]));
   return true;
 }
 
@@ -310,14 +326,14 @@ void main() {
     colorMax = (reflectedColor + vec3(0.7))/1.7;
     
     rayDirection = reflect(rayDirection, N);
-    if (!shadow && intersectSomething(intersection1, rayDirection, intersection2, N, tempColor, \
+    if (!shadow && intersectSomething(intersection1+0.00001, rayDirection, intersection2, N, tempColor, \
         reflectedColor, shadow)) {
-      color += tempColor * colorMax;
+      color += 0.3*tempColor ;
       colorMax = (reflectedColor + vec3(0.7))/1.7;
       rayDirection = reflect(rayDirection, N);
-      if (!shadow && intersectSomething(intersection2, rayDirection, intersection1, N, tempColor, \
+      if (!shadow && intersectSomething(intersection2+0.00001, rayDirection, intersection1, N, tempColor, \
             reflectedColor, shadow)) {
-        color += tempColor * colorMax;  
+        color += 0.3*tempColor ;
       }
     }
     
