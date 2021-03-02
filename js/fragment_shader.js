@@ -4,6 +4,11 @@
 // This is a template string (notice `)
 const fragmentShaderCode = `
 
+#define PI 0.31415926538
+#define PHI 0.161803398874989484820459
+#define THETA 0.078539816339
+#define SQ2 14142.1356237309504880169
+
 precision mediump float;
 
 varying vec3 nearPosition;
@@ -30,6 +35,90 @@ vec3 lightPosition;
 vec3 Ii;
 float ka, kd, ks;
 float n;
+
+int get_neighbour_offset(int i, int j) {
+  float a = float(i);
+  float b = float(j);
+  int bit = 0;
+  for(int k = 7; k >= 0; k--){
+      if(a >=  pow(2.0,float(k))){
+          a = a - pow(2.0,float(k));
+          if(b == float(k)){
+              bit = 1;
+          }
+      }
+  }
+  return bit;
+}
+
+float get_nearest_noise(vec3 position, float seed, const int dim) {
+
+  float d = 0.0;
+
+  for (int index_dim = 0; index_dim < dim; index_dim++) {
+      float a = PHI;
+
+      if (index_dim == 1) {
+          a = PI;
+      }
+
+      if (index_dim == 2) {
+          a = THETA;
+      }
+
+      float p = position[index_dim];
+      float p_floor = floor(p);
+      float b = p_floor * (seed + PHI) - a;
+      d += b * b;
+  }
+
+  float s = sqrt(d + 1.0e-8);
+  float t = tan(s) * SQ2;
+  float noise = t - floor(t);
+
+  return noise;
+}
+
+float  bilinearNoise(vec3 position, float seed, const int dim){
+  float noise = 0.0;
+
+  // calculate bilinear noise
+  // reference to bilinear interpolation:
+  // https://www.scratchapixel.com/lessons/mathematics-physics-for-computer-graphics/interpolation/bilinear-filtering
+  for(int j = 0; j < (dim*dim); j++) {
+
+      float weight = 1.0;
+
+      // calculate weights for interpolation
+      for (int i = 0; i < dim; i++) {
+          float lambda = (position[i] - 0.5) - floor(position[i] - 0.5);
+          int offset = get_neighbour_offset(j,i);
+
+          if (offset == 0) {
+              weight = weight * (1.0 - lambda);
+          }
+          else {
+              weight = weight * lambda;
+          }
+      }
+
+      for(int p = 0; p < dim; p++) {
+          int offset = get_neighbour_offset(j,p);
+          position[p] += float(offset) - 0.5;
+      }
+
+      float nearest_noise = get_nearest_noise(position, seed, dim);
+
+      noise = noise + weight * nearest_noise;
+
+      for(int q = 0; q < dim; q++) {
+          int offset = get_neighbour_offset(j,q);
+          position[q] -=  float(offset) - 0.5;
+      }
+  }
+
+  return noise;
+}
 
 bool intersectSphere(vec3 origin, vec3 rayDirection, out vec3 intersection,
                      out float dist,
@@ -326,12 +415,12 @@ void main() {
     colorMax = (reflectedColor + vec3(0.7))/1.7;
     
     rayDirection = reflect(rayDirection, N);
-    if (!shadow && intersectSomething(intersection1+0.00001, rayDirection, intersection2, N, tempColor, \
+    if (intersectSomething(intersection1+0.00001, rayDirection, intersection2, N, tempColor, \
         reflectedColor, shadow)) {
       color += 0.3*tempColor ;
       colorMax = (reflectedColor + vec3(0.7))/1.7;
       rayDirection = reflect(rayDirection, N);
-      if (!shadow && intersectSomething(intersection2+0.00001, rayDirection, intersection1, N, tempColor, \
+      if (intersectSomething(intersection2+0.00001, rayDirection, intersection1, N, tempColor, \
             reflectedColor, shadow)) {
         color += 0.3*tempColor ;
       }
