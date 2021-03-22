@@ -1,9 +1,4 @@
-// The Fragment Shader is a program in GLSL. It is responsible
-// for the color, basically. (Need to learn more)
-//
-// This is a template string (notice `)
 const fragmentShaderCode = `
-
 #define PI 0.31415926538
 #define PHI 0.161803398874989484820459
 #define THETA 0.078539816339
@@ -22,6 +17,7 @@ uniform vec3 cubeCenter;
 uniform vec3 origPlane;
 
 uniform vec3 norPlane;
+uniform float scalePerlin;
 vec3 A, B, C, D, E, F, G, H;
 
 
@@ -51,7 +47,9 @@ int get_neighbour_offset(int i, int j) {
   return bit;
 }
 
-float get_nearest_noise(vec3 position, float seed, const int dim) {
+const int dim = 3;
+
+float get_nearest_noise(vec3 position, float seed) {
 
   float d = 0.0;
 
@@ -66,7 +64,7 @@ float get_nearest_noise(vec3 position, float seed, const int dim) {
           a = THETA;
       }
 
-      float p = position[index_dim];
+      float p = position[index_dim]*scalePerlin-0.00001;
       float p_floor = floor(p);
       float b = p_floor * (seed + PHI) - a;
       d += b * b;
@@ -79,7 +77,7 @@ float get_nearest_noise(vec3 position, float seed, const int dim) {
   return noise;
 }
 
-float  bilinearNoise(vec3 position, float seed, const int dim){
+float  bilinearNoise(vec3 position, float seed){
   float noise = 0.0;
 
   // calculate bilinear noise
@@ -107,7 +105,7 @@ float  bilinearNoise(vec3 position, float seed, const int dim){
           position[p] += float(offset) - 0.5;
       }
 
-      float nearest_noise = get_nearest_noise(position, seed, dim);
+      float nearest_noise = get_nearest_noise(position, seed);
 
       noise = noise + weight * nearest_noise;
 
@@ -360,7 +358,8 @@ bool intersectSomething(vec3 origin, vec3 rayDirection, out vec3 intersection,
       if(i==0){
         color = reflectedColor;
       }else{
-        color = vec3(sin(intersection[0]), cos(2.0*intersection[1]), sin(3.0*intersection[2]));
+        float noise = get_nearest_noise(intersection, 0.0);
+        color = vec3(get_nearest_noise(intersection, -1.0), noise, get_nearest_noise(intersection, 1.0));
         //reflectedColor = vec3(sin(intersection[0]), cos(2.0*intersection[1]), sin(3.0*intersection[2]));
       }
       minDist = dist[i];

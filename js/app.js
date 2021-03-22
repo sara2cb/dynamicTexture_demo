@@ -140,12 +140,16 @@ function initDemo() {
   const planePointLocation = gl.getUniformLocation(program, 'origPlane');
   const planeDirectionLocation = gl.getUniformLocation(program, 'norPlane');
 
+  const scalePerlinFactor = gl.getUniformLocation(program, 'scalePerlin');
+
   gl.uniform3f(sphereCenterLocation, 0.0, 2.5, -5.0);
   gl.uniform3f(cubeCenterLocation, 0.0, 2.5, 5.0);
-  gl.uniform3f(planePointLocation, 1.0, 3.0, 0.0);
+  gl.uniform3f(planePointLocation, 0.0, 3.0, 0.0);
   
   gl.uniform1f(floorRadiusLocation, 20.0);
   gl.uniform1f(floorHeightLocation, -1.0);
+
+  gl.uniform1f(scalePerlinFactor, 1.0);
 
   const up = vec3.fromValues(0.0, 1.0, 0.0);
   const cameraTo = vec3.fromValues(0.0, 0.0, 0.0);
@@ -175,6 +179,10 @@ function initDemo() {
       gl.uniform3f(planeDirectionLocation, dirx, diry, dirz);
     }
     
+    var perlin = parseFloat(document.getElementById("perlin").value);
+    if(perlin != NaN ){
+      gl.uniform1f(scalePerlinFactor, perlin);
+    }
 
     // resize canvas in case window size has changed
     if (canvas.width !== window.innerWidth
