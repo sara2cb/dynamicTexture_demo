@@ -1,12 +1,15 @@
-const fragmentShaderCode = `
+const fragmentShaderCode = `#version 300 es
+
 #define PI 0.31415926538
 #define PHI 0.161803398874989484820459
 #define THETA 0.078539816339
 #define SQ2 14142.1356237309504880169
 
-precision mediump float;
+precision highp float;
 
-varying vec3 nearPosition;
+out vec4 fragColor;
+
+in vec3 nearPosition;
 
 uniform vec3 cameraPosition;
 
@@ -17,12 +20,14 @@ uniform vec3 cubeCenter;
 uniform vec3 origPlane;
 
 uniform vec3 norPlane;
-uniform float scalePerlin;
-vec3 A, B, C, D, E, F, G, H;
-
+uniform vec3 scalePerlin;
+uniform vec3 transPerlin;
 
 uniform float floorHeight;
 uniform float floorRadius;
+
+vec3 A, B, C, D, E, F, G, H;
+
 
 float cs;
 
@@ -33,18 +38,8 @@ float ka, kd, ks;
 float n;
 
 int get_neighbour_offset(int i, int j) {
-  float a = float(i);
-  float b = float(j);
-  int bit = 0;
-  for(int k = 7; k >= 0; k--){
-      if(a >=  pow(2.0,float(k))){
-          a = a - pow(2.0,float(k));
-          if(b == float(k)){
-              bit = 1;
-          }
-      }
-  }
-  return bit;
+
+  return (i >> j) & 1;
 }
 
 const int dim = 3;
@@ -64,7 +59,7 @@ float get_nearest_noise(vec3 position, float seed) {
           a = THETA;
       }
 
-      float p = position[index_dim]*scalePerlin-0.00001;
+      float p = (position[index_dim]);
       float p_floor = floor(p);
       float b = p_floor * (seed + PHI) - a;
       d += b * b;
@@ -77,21 +72,25 @@ float get_nearest_noise(vec3 position, float seed) {
   return noise;
 }
 
-float  bilinearNoise(vec3 position, float seed){
+const int perm = int(pow(2.0,float(dim)));
+
+float  bilinearNoise(vec3 position, float seed, vec3 trans, vec3 scale){
   float noise = 0.0;
+
+  position = (position+transPerlin)*scalePerlin;
 
   // calculate bilinear noise
   // reference to bilinear interpolation:
   // https://www.scratchapixel.com/lessons/mathematics-physics-for-computer-graphics/interpolation/bilinear-filtering
-  for(int j = 0; j < (dim*dim); j++) {
+  for(int j = 0; j < perm; j++) {
 
       float weight = 1.0;
-
+      
       // calculate weights for interpolation
       for (int i = 0; i < dim; i++) {
-          float lambda = (position[i] - 0.5) - floor(position[i] - 0.5);
+          float lambda = (position[i] - 1.0) - floor(position[i] - 1.0);
           int offset = get_neighbour_offset(j,i);
-
+ 
           if (offset == 0) {
               weight = weight * (1.0 - lambda);
           }
@@ -102,16 +101,16 @@ float  bilinearNoise(vec3 position, float seed){
 
       for(int p = 0; p < dim; p++) {
           int offset = get_neighbour_offset(j,p);
-          position[p] += float(offset) - 0.5;
+          position[p] += float(offset) - 1.0;
       }
 
       float nearest_noise = get_nearest_noise(position, seed);
 
-      noise = noise + weight * nearest_noise;
+      noise = noise + weight * nearest_noise ;
 
       for(int q = 0; q < dim; q++) {
           int offset = get_neighbour_offset(j,q);
-          position[q] -=  float(offset) - 0.5;
+          position[q] -=  float(offset) - 1.0;
       }
   }
 
@@ -351,16 +350,25 @@ bool intersectSomething(vec3 origin, vec3 rayDirection, out vec3 intersection,
   for (int i = 0; i < 4; i++)
   {
     if(interBool[i] && (minDist > dist[i])){
-      intersection = inter[i];
+      intersection = inter[i]+0.0001;
       N = Ns[i];
       V = Vs[i];
       L = Ls[i];
       if(i==0){
         color = reflectedColor;
       }else{
-        float noise = get_nearest_noise(intersection, 0.0);
-        color = vec3(get_nearest_noise(intersection, -1.0), noise, get_nearest_noise(intersection, 1.0));
-        //reflectedColor = vec3(sin(intersection[0]), cos(2.0*intersection[1]), sin(3.0*intersection[2]));
+
+        //Grass
+        float noisex = bilinearNoise(intersection, 0.0, transPerlin, scalePerlin);
+        float noisey = bilinearNoise(intersection, 0.0, transPerlin, scalePerlin);
+        float noisez = bilinearNoise(intersection, 0.0, transPerlin, scalePerlin);
+
+        color = (vec3(noisex*0.2, noisey*0.8, noisez*0.3)+0.1)*0.7;
+
+        noisex = bilinearNoise(intersection, -1.0, transPerlin, scalePerlin);
+        noisey = bilinearNoise(intersection, -1.0, transPerlin, scalePerlin);
+        noisez = bilinearNoise(intersection, -1.0, transPerlin, scalePerlin);
+        color += (vec3(noisex*1.0, noisey*0.6, noisez*0.2)+0.1)*0.5;
       }
       minDist = dist[i];
     }
@@ -414,20 +422,20 @@ void main() {
     colorMax = (reflectedColor + vec3(0.7))/1.7;
     
     rayDirection = reflect(rayDirection, N);
-    if (intersectSomething(intersection1+0.00001, rayDirection, intersection2, N, tempColor, \
+    if (intersectSomething(intersection1, rayDirection, intersection2, N, tempColor, \
         reflectedColor, shadow)) {
       color += 0.3*tempColor ;
       colorMax = (reflectedColor + vec3(0.7))/1.7;
       rayDirection = reflect(rayDirection, N);
-      if (intersectSomething(intersection2+0.00001, rayDirection, intersection1, N, tempColor, \
+      if (intersectSomething(intersection2, rayDirection, intersection1, N, tempColor, \
             reflectedColor, shadow)) {
         color += 0.3*tempColor ;
       }
     }
     
-    gl_FragColor = vec4(color, 1.0); 
+    fragColor = vec4(color, 1.0); 
   } else {
-    gl_FragColor = vec4(0.1, 0.1, 0.1, 1.0);
+    fragColor = vec4(0.1, 0.1, 0.1, 1.0);
   }
 }
 

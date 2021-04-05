@@ -2,14 +2,14 @@
 // It basically is a function that runs on every vertex
 //
 // This is a template string (notice `)
-const vertexShaderCode = `
+const vertexShaderCode = `#version 300 es
 
 precision mediump float;
 
-attribute vec2 vertexPosition;
-attribute vec3 plotPosition;
+in vec2 vertexPosition;
+in vec3 plotPosition;
 
-varying vec3 nearPosition;
+out vec3 nearPosition;
 
 void main()
 {

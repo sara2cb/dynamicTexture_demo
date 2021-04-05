@@ -8,7 +8,7 @@ function initDemo() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
 
-  let gl = canvas.getContext('webgl');
+  let gl = canvas.getContext('webgl2');
 
   if (!gl) {
     // Some browsers have only experimental support.
@@ -61,6 +61,7 @@ function initDemo() {
   gl.attachShader(program, vertexShader);
   gl.attachShader(program, fragmentShader);
   gl.linkProgram(program);
+  gl.useProgram(program);
   // Additional checking if everything went fine
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
     console.error(
@@ -141,6 +142,7 @@ function initDemo() {
   const planeDirectionLocation = gl.getUniformLocation(program, 'norPlane');
 
   const scalePerlinFactor = gl.getUniformLocation(program, 'scalePerlin');
+  const transPerlinFactor = gl.getUniformLocation(program, 'transPerlin');
 
   gl.uniform3f(sphereCenterLocation, 0.0, 2.5, -5.0);
   gl.uniform3f(cubeCenterLocation, 0.0, 2.5, 5.0);
@@ -149,7 +151,8 @@ function initDemo() {
   gl.uniform1f(floorRadiusLocation, 20.0);
   gl.uniform1f(floorHeightLocation, -1.0);
 
-  gl.uniform1f(scalePerlinFactor, 1.0);
+  gl.uniform3f(scalePerlinFactor, 1.0,1.0,1.0);
+  gl.uniform3f(transPerlinFactor, 1.0,1.0,1.0);
 
   const up = vec3.fromValues(0.0, 1.0, 0.0);
   const cameraTo = vec3.fromValues(0.0, 0.0, 0.0);
@@ -179,9 +182,17 @@ function initDemo() {
       gl.uniform3f(planeDirectionLocation, dirx, diry, dirz);
     }
     
-    var perlin = parseFloat(document.getElementById("perlin").value);
-    if(perlin != NaN ){
-      gl.uniform1f(scalePerlinFactor, perlin);
+    var perlinx = parseFloat(document.getElementById("perx").value);
+    var perliny = parseFloat(document.getElementById("pery").value);
+    var perlinz = parseFloat(document.getElementById("perz").value);
+    if(perlinx != NaN && perliny != NaN && perlinz != NaN ){
+      gl.uniform3f(scalePerlinFactor, perlinx, perliny, perlinz);
+    }
+    var perlinxTr = parseFloat(document.getElementById("perxTr").value);
+    var perlinyTr = parseFloat(document.getElementById("peryTr").value);
+    var perlinzTr = parseFloat(document.getElementById("perzTr").value);
+    if(perlinxTr != NaN && perlinyTr != NaN && perlinzTr != NaN ){
+      gl.uniform3f(transPerlinFactor, perlinzTr, perlinyTr, perlinzTr);
     }
 
     // resize canvas in case window size has changed
