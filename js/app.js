@@ -144,6 +144,9 @@ function initDemo() {
   const scalePerlinFactor = gl.getUniformLocation(program, 'scalePerlin');
   const transPerlinFactor = gl.getUniformLocation(program, 'transPerlin');
 
+
+  const modeSh = gl.getUniformLocation(program, 'mode');
+
   gl.uniform3f(sphereCenterLocation, 0.0, 2.5, -5.0);
   gl.uniform3f(cubeCenterLocation, 0.0, 2.5, 5.0);
   gl.uniform3f(planePointLocation, 0.0, 3.0, 0.0);
@@ -153,6 +156,9 @@ function initDemo() {
 
   gl.uniform3f(scalePerlinFactor, 1.0,1.0,1.0);
   gl.uniform3f(transPerlinFactor, 1.0,1.0,1.0);
+
+  var prevMod = 0;
+  gl.uniform1i(modeSh, 0);
 
   const up = vec3.fromValues(0.0, 1.0, 0.0);
   const cameraTo = vec3.fromValues(0.0, 0.0, 0.0);
@@ -193,6 +199,29 @@ function initDemo() {
     var perlinzTr = parseFloat(document.getElementById("perzTr").value);
     if(perlinxTr != NaN && perlinyTr != NaN && perlinzTr != NaN ){
       gl.uniform3f(transPerlinFactor, perlinzTr, perlinyTr, perlinzTr);
+    }
+
+    var modecur = parseFloat(document.getElementById("mode").value);
+    if(modecur != prevMod){
+      if(modecur == 0 || modecur == 1 ){
+        document.getElementById("perx").value = 1.0
+        document.getElementById("pery").value = 1.0
+        document.getElementById("perz").value = 1.0
+      }else if(modecur == 2){
+        document.getElementById("perx").value = 10.0
+        document.getElementById("pery").value = 10.0
+        document.getElementById("perz").value = 10.0
+      }else if(modecur == 3){
+        document.getElementById("perx").value = 60.0
+        document.getElementById("pery").value = 20.0
+        document.getElementById("perz").value = 60.0
+      }else{
+        document.getElementById("perx").value = 4.0
+        document.getElementById("pery").value = 80.0
+        document.getElementById("perz").value = 4.0
+      }
+      gl.uniform1i(modeSh, modecur)
+      prevMod = modecur
     }
 
     // resize canvas in case window size has changed

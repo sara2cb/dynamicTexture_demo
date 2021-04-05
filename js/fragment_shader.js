@@ -26,6 +26,8 @@ uniform vec3 transPerlin;
 uniform float floorHeight;
 uniform float floorRadius;
 
+uniform int mode;
+
 vec3 A, B, C, D, E, F, G, H;
 
 
@@ -43,6 +45,36 @@ int get_neighbour_offset(int i, int j) {
 }
 
 const int dim = 3;
+
+float get_nearest_noise(vec3 position, float seed, vec3 trans, vec3 scale) {
+
+  float d = 0.0;
+
+  position = (position+transPerlin)*scalePerlin;
+
+  for (int index_dim = 0; index_dim < dim; index_dim++) {
+      float a = PHI;
+
+      if (index_dim == 1) {
+          a = PI;
+      }
+
+      if (index_dim == 2) {
+          a = THETA;
+      }
+
+      float p = (position[index_dim]);
+      float p_floor = floor(p);
+      float b = p_floor * (seed + PHI) - a;
+      d += b * b;
+  }
+
+  float s = sqrt(d + 1.0e-8);
+  float t = tan(s) * SQ2;
+  float noise = t - floor(t);
+
+  return noise;
+}
 
 float get_nearest_noise(vec3 position, float seed) {
 
@@ -82,6 +114,7 @@ float  bilinearNoise(vec3 position, float seed, vec3 trans, vec3 scale){
   // calculate bilinear noise
   // reference to bilinear interpolation:
   // https://www.scratchapixel.com/lessons/mathematics-physics-for-computer-graphics/interpolation/bilinear-filtering
+  // https://www.scratchapixel.com/lessons/mathematics-physics-for-computer-graphics/interpolation/trilinear-interpolation
   for(int j = 0; j < perm; j++) {
 
       float weight = 1.0;
@@ -357,18 +390,44 @@ bool intersectSomething(vec3 origin, vec3 rayDirection, out vec3 intersection,
       if(i==0){
         color = reflectedColor;
       }else{
+        if(mode == 0){
+          float noise = get_nearest_noise(intersection, 0.0, transPerlin, scalePerlin);
+        color = vec3(get_nearest_noise(intersection, -1.0, transPerlin, scalePerlin), noise, get_nearest_noise(intersection, 1.0, transPerlin, scalePerlin));
+        }else if(mode == 1){
+          float noise = bilinearNoise(intersection, 0.0, transPerlin, scalePerlin);
+          color = vec3(bilinearNoise(intersection, -1.0, transPerlin, scalePerlin), noise, bilinearNoise(intersection, 1.0, transPerlin, scalePerlin));
+        }else if(mode == 2){
+          //marble
+          float noisex = bilinearNoise(intersection, 0.0, transPerlin, scalePerlin);
+          float noisey = bilinearNoise(intersection, 0.0, transPerlin, scalePerlin);
+          float noisez = bilinearNoise(intersection, 0.0, transPerlin, scalePerlin);
+  
+          color = vec3(noisex, noisey, noisez);
+        }else if(mode == 3){
+          //Grass scale 60, 20, 60
+          float noisex = bilinearNoise(intersection, 0.0, transPerlin, scalePerlin);
+          float noisey = bilinearNoise(intersection, 0.0, transPerlin, scalePerlin);
+          float noisez = bilinearNoise(intersection, 0.0, transPerlin, scalePerlin);
 
-        //Grass
-        float noisex = bilinearNoise(intersection, 0.0, transPerlin, scalePerlin);
-        float noisey = bilinearNoise(intersection, 0.0, transPerlin, scalePerlin);
-        float noisez = bilinearNoise(intersection, 0.0, transPerlin, scalePerlin);
+          color = (vec3(noisex*0.2, noisey*0.8, noisez*0.3)+0.1)*0.6;
 
-        color = (vec3(noisex*0.2, noisey*0.8, noisez*0.3)+0.1)*0.7;
+          noisex = bilinearNoise(intersection, -1.0, transPerlin, scalePerlin);
+          noisey = bilinearNoise(intersection, -1.0, transPerlin, scalePerlin);
+          noisez = bilinearNoise(intersection, -1.0, transPerlin, scalePerlin);
+          color += (vec3(noisex*1.0, noisey*0.6, noisez*0.2)+0.1)*0.4;
+        }else if(mode == 4){
+          //Wood scale 4, 80, 4
+          float noisex = bilinearNoise(intersection, 1.0, transPerlin, scalePerlin);
+          float noisey = bilinearNoise(intersection, 1.0, transPerlin, scalePerlin);
+          float noisez = bilinearNoise(intersection, 1.0, transPerlin, scalePerlin);
 
-        noisex = bilinearNoise(intersection, -1.0, transPerlin, scalePerlin);
-        noisey = bilinearNoise(intersection, -1.0, transPerlin, scalePerlin);
-        noisez = bilinearNoise(intersection, -1.0, transPerlin, scalePerlin);
-        color += (vec3(noisex*1.0, noisey*0.6, noisez*0.2)+0.1)*0.5;
+          color = (vec3(noisex*0.7+0.5, noisey*0.4+0.35, noisez*0.2+0.2))*0.8;
+
+          noisex = bilinearNoise(intersection, -1.0, transPerlin, scalePerlin);
+          noisey = bilinearNoise(intersection, -1.0, transPerlin, scalePerlin);
+          noisez = bilinearNoise(intersection, -0.2, transPerlin, scalePerlin);
+          color += (vec3(noisex*0.2+0.5, noisey*0.8+0.3, noisez*0.2+0.1))*0.2;
+        }
       }
       minDist = dist[i];
     }
@@ -392,6 +451,7 @@ bool intersectSomething(vec3 origin, vec3 rayDirection, out vec3 intersection,
 void main() {
   lightPosition = vec3(0.0, 20.0, 0.0);
   vec3 rayDirection = normalize(nearPosition - cameraPosition);
+
 
   vec3 intersection1, intersection2;
 
