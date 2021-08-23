@@ -4,6 +4,8 @@ const fragmentShaderCode = `#version 300 es
 #define PHI 0.161803398874989484820459
 #define THETA 0.078539816339
 #define SQ2 14142.1356237309504880169
+#define noCubes 1
+#define noSpheres 1
 
 precision highp float;
 
@@ -13,22 +15,33 @@ in vec3 nearPosition;
 
 uniform vec3 cameraPosition;
 
-uniform vec3 sphereCenter;
+uniform vec3 sphere1;
+uniform vec3 sphere2;
+vec3 sphereCenter[noSpheres] ;
 
-uniform vec3 cubeCenter;
+uniform vec3 cube1;
+uniform vec3 cube2;
+vec3 cubeCenter[noCubes] ;
 
-uniform vec3 origPlane;
 
 uniform vec3 norPlane;
 uniform vec3 scalePerlin;
 uniform vec3 transPerlin;
+uniform vec3 anglePerlin;
+uniform vec3 scalePerlin1;
+uniform vec3 transPerlin1;
+uniform vec3 anglePerlin1;
+uniform vec3 brightPerlin1;
+uniform vec3 weightPerlin1;
+uniform vec3 brightPerlin2;
+uniform vec3 weightPerlin2;
 
-uniform float floorHeight;
+uniform vec3 floorLocation;
 uniform float floorRadius;
 
 uniform int mode;
 
-vec3 A, B, C, D, E, F, G, H;
+vec3 A[noCubes], B[noCubes], C[noCubes], D[noCubes], E[noCubes], F[noCubes], G[noCubes], H[noCubes];
 
 
 float cs;
@@ -39,6 +52,28 @@ vec3 Ii;
 float ka, kd, ks;
 float n;
 
+vec3 rotate(vec3 origin, vec3 point, vec3 angle){
+    /*
+    Rotate a point counterclockwise by a given angle around a given origin.
+
+    The angle should be given in radians.
+    */
+
+    float qx = origin[0] + cos(angle[2]) * (point[0] - origin[0]) - sin(angle[2]) * (point[1] - origin[1]);
+    float qy = origin[1] + sin(angle[2]) * (point[0] - origin[0]) + cos(angle[2]) * (point[1] - origin[1]);
+    vec3 newPos = vec3(qx, qy, point[2]);
+
+    qy = origin[1] + cos(angle[0]) * (newPos[1] - origin[1]) - sin(angle[0]) * (newPos[2] - origin[2]);
+    float qz = origin[2] + sin(angle[0]) * (newPos[1] - origin[1]) + cos(angle[0]) * (newPos[2] - origin[2]);
+    newPos = vec3(newPos[0], qy, qz);
+
+    qz = origin[2] + cos(angle[1]) * (newPos[2] - origin[2]) - sin(angle[1]) * (newPos[0] - origin[0]);
+    qx = origin[0] + sin(angle[1]) * (newPos[2] - origin[2]) + cos(angle[1]) * (newPos[0] - origin[0]);
+    newPos = vec3(qx, newPos[1], qz);
+
+    return newPos;
+  }
+
 int get_neighbour_offset(int i, int j) {
 
   return (i >> j) & 1;
@@ -46,11 +81,11 @@ int get_neighbour_offset(int i, int j) {
 
 const int dim = 3;
 
-float get_nearest_noise(vec3 position, float seed, vec3 trans, vec3 scale) {
+float get_nearest_noise(vec3 position, float seed, vec3 trans, vec3 scale, vec3 rotation) {
 
   float d = 0.0;
 
-  position = (position+transPerlin)*scalePerlin;
+  position = (rotate(vec3(0.0), position, rotation)+transPerlin)*scalePerlin;
 
   for (int index_dim = 0; index_dim < dim; index_dim++) {
       float a = PHI;
@@ -106,10 +141,10 @@ float get_nearest_noise(vec3 position, float seed) {
 
 const int perm = int(pow(2.0,float(dim)));
 
-float  bilinearNoise(vec3 position, float seed, vec3 trans, vec3 scale){
+float  trilinearNoise(vec3 position, float seed, vec3 trans, vec3 scale, vec3 rotation){
   float noise = 0.0;
 
-  position = (position+transPerlin)*scalePerlin;
+  position = (rotate(vec3(0.0), position, rotation)+transPerlin)*scalePerlin;
 
   // calculate bilinear noise
   // reference to bilinear interpolation:
@@ -150,16 +185,18 @@ float  bilinearNoise(vec3 position, float seed, vec3 trans, vec3 scale){
   return noise;
 }
 
-bool intersectSphere(vec3 origin, vec3 rayDirection, out vec3 intersection,
+bool intersectSphere(vec3 origin, vec3 rayDirection, vec3 sphereCenter, out vec3 intersection,
                      out float dist,
                      out vec3 V, out vec3 N, out vec3 L) {
   vec3 rayToSphere = sphereCenter - origin;
-  float b = dot(rayDirection, -rayToSphere);
-  float d = (b * b) - dot(rayToSphere, rayToSphere) + 2.5 * 2.5;
+  float b = dot(rayDirection, rayToSphere);
+  if (b < 0.0) return false;
+  float d = sqrt( dot(rayToSphere, rayToSphere) - b * b);
+  if (d > 2.5) return false;
 
-  if (d < 0.0) return false;
+  
 
-  dist = -b - sqrt(d);
+  dist = b - sqrt(2.5*2.5 - d*d);
   if (dist < 0.0) return false;
 
   intersection = origin + rayDirection * dist;
@@ -174,19 +211,21 @@ bool intersectFloor(vec3 origin, vec3 rayDirection, out vec3 intersection,
                     out float dist,
                     out vec3 V, out vec3 N, out vec3 L,
                     out vec3 color) {
-  dist = (floorHeight - origin.y) / rayDirection.y;
+  dist = (floorLocation[1] - origin.y) / rayDirection.y;
   if (dist < 0.0) return false;
 
-  float x = origin.x + rayDirection.x * dist;
-  float z = origin.z + rayDirection.z * dist;
-  if (x*x + z*z > floorRadius*floorRadius) return false;
+  float x = origin.x + rayDirection.x * dist  + floorLocation[0];
+  float z = origin.z + rayDirection.z * dist + floorLocation[2];
+  if (x*x+ z*z > floorRadius*floorRadius  ) return false;
 
-  if (x < 0.0 && z < 0.0) color = vec3(1.0, 1.0, 0.0);
-  else if (x < 0.0 && z > 0.0) color = vec3(1.0, 0.0, 1.0);
-  else if (x > 0.0 && z < 0.0) color = vec3(0.0, 0.5, 0.5);
-  else if (x > 0.0 && z > 0.0) color = vec3(0.5, 0.5, 0.5);
+  if(mod(x, 1.5) < 0.07 || mod(z, 1.5) < 0.07) color = vec3(1.0, 1.0, 1.0);
+  else color = vec3(0.5, 0.5, 0.5);
+  /*if (x < 0.0 && z < 0.0) color = vec3(0.5, 0.5, 0.5);
+  else if (x < 0.0 && z > 0.0) color = vec3(0.5, 0.5, 0.5);
+  else if (x > 0.0 && z < 0.0) color = vec3(0.5, 0.5, 0.5);
+  else if (x > 0.0 && z > 0.0) color = vec3(0.5, 0.5, 0.5);*/
 
-  intersection = vec3(x, floorHeight, z);
+  intersection = vec3(x, floorLocation[1], z);
   V = -rayDirection;
   N = vec3(0.0, 1.0, 0.0);
   L = normalize(lightPosition - intersection);
@@ -194,7 +233,7 @@ bool intersectFloor(vec3 origin, vec3 rayDirection, out vec3 intersection,
   return true;
 }
 
-bool intersectPlane(vec3 origin, vec3 rayDirection, out vec3 intersection,
+bool intersectPlane(vec3 origin, vec3 rayDirection, vec3 origPlane, vec3 norPlane, out vec3 intersection,
   out float dist,
   out vec3 V, out vec3 N, out vec3 L) {
   
@@ -270,39 +309,39 @@ bool intersectTriangle(vec3 origin, vec3 rayDirection, out vec3 intersection,
     return true;
 }
 
-bool intersectCube(vec3 origin, vec3 rayDirection, out vec3 intersection,
+bool intersectCube(vec3 origin, vec3 rayDirection, int cubeI, out vec3 intersection,
                    out float dist,
                    out vec3 V, out vec3 N, out vec3 L) {
 
-  if (intersectTriangle(origin, rayDirection, intersection, dist, A, C, B, V, N, L))
+  if (intersectTriangle(origin, rayDirection, intersection, dist, A[cubeI], C[cubeI], B[cubeI], V, N, L))
     return true;
-  else if (intersectTriangle(origin, rayDirection, intersection, dist, A, D, C, V, N, L))
+  else if (intersectTriangle(origin, rayDirection, intersection, dist, A[cubeI], D[cubeI], C[cubeI], V, N, L))
     return true;
-  else if (intersectTriangle(origin, rayDirection, intersection, dist, A, F, E, V, N, L))
+  else if (intersectTriangle(origin, rayDirection, intersection, dist, A[cubeI], F[cubeI], E[cubeI], V, N, L))
     return true;
-  else if (intersectTriangle(origin, rayDirection, intersection, dist, A, B, F, V, N, L))
+  else if (intersectTriangle(origin, rayDirection, intersection, dist, A[cubeI], B[cubeI], F[cubeI], V, N, L))
     return true;
-  else if (intersectTriangle(origin, rayDirection, intersection, dist, A, E, H, V, N, L))
+  else if (intersectTriangle(origin, rayDirection, intersection, dist, A[cubeI], E[cubeI], H[cubeI], V, N, L))
     return true;
-  else if (intersectTriangle(origin, rayDirection, intersection, dist, A, H, D, V, N, L))
+  else if (intersectTriangle(origin, rayDirection, intersection, dist, A[cubeI], H[cubeI], D[cubeI], V, N, L))
     return true;
-  else if (intersectTriangle(origin, rayDirection, intersection, dist, G, E, F, V, N, L))
+  else if (intersectTriangle(origin, rayDirection, intersection, dist, G[cubeI], E[cubeI], F[cubeI], V, N, L))
     return true;
-  else if (intersectTriangle(origin, rayDirection, intersection, dist, G, H, E, V, N, L))
+  else if (intersectTriangle(origin, rayDirection, intersection, dist, G[cubeI], H[cubeI], E[cubeI], V, N, L))
     return true;
-  else if (intersectTriangle(origin, rayDirection, intersection, dist, G, F, B, V, N, L))
+  else if (intersectTriangle(origin, rayDirection, intersection, dist, G[cubeI], F[cubeI], B[cubeI], V, N, L))
     return true;
-  else if (intersectTriangle(origin, rayDirection, intersection, dist, G, B, C, V, N, L))
+  else if (intersectTriangle(origin, rayDirection, intersection, dist, G[cubeI], B[cubeI], C[cubeI], V, N, L))
     return true;
-  else if (intersectTriangle(origin, rayDirection, intersection, dist, G, C, D, V, N, L))
+  else if (intersectTriangle(origin, rayDirection, intersection, dist, G[cubeI], C[cubeI], D[cubeI], V, N, L))
     return true;
-  else if (intersectTriangle(origin, rayDirection, intersection, dist, G, D, H, V, N, L))
+  else if (intersectTriangle(origin, rayDirection, intersection, dist, G[cubeI], D[cubeI], H[cubeI], V, N, L))
     return true;
 
   return false;
 }
 
-bool insideCube(vec3 origin) {
+bool insideCube(vec3 origin, vec3 cubeCenter) {
 
   vec3 diff = origin - cubeCenter;
   if(abs(diff[0]) > (5.0/2.0) || abs(diff[1]) > (5.0/2.0) || abs(diff[2]) > (5.0/2.0)){
@@ -311,7 +350,7 @@ bool insideCube(vec3 origin) {
   return true;
 }
 
-bool insideSphere(vec3 origin) {
+bool insideSphere(vec3 origin, vec3 sphereCenter) {
 
   vec3 diff = origin - sphereCenter;
   if(length(diff) > 2.5){
@@ -319,7 +358,7 @@ bool insideSphere(vec3 origin) {
   }
   return true;
 }
-bool frontPlane(vec3 origin) {
+bool frontPlane(vec3 origin, vec3 origPlane, vec3 norPlane) {
   vec3 subs = origPlane - origin;
   float t = dot(subs, normalize(norPlane));
   return (t<0.0);
@@ -342,16 +381,22 @@ bool intersectSomethingGoingToLight(vec3 origin, vec3 N_aux) {
   float dist;
   vec3 V, N, L;
 
-  bool interCube = intersectCube(origin, rayDirection, intersection, dist, V,N,L) && \
-              !frontPlane(intersection);
-  if (interCube){
-    if (dist < distToLight) return true;
+  for(int i; i < noCubes; i++){
+    bool interCube = intersectCube(origin, rayDirection, i, intersection, dist, V,N,L) && \
+                !frontPlane(intersection, cubeCenter[i], norPlane);
+    if (interCube){
+      if (dist < distToLight) return true;
+    }
   }
-  bool interSphere = intersectSphere(origin, rayDirection, intersection, dist, V,N,L) && \
-              !frontPlane(intersection);
-  if (interSphere){
-    if (dist < distToLight) return true;
+
+  for(int i; i < noSpheres; i++){
+    bool interSphere = intersectSphere(origin, rayDirection, sphereCenter[i], intersection, dist, V,N,L) && \
+              !frontPlane(intersection, sphereCenter[i], norPlane);
+    if (interSphere){
+      if (dist < distToLight) return true;
+    }
   }
+  
 
   return false;
 }
@@ -359,79 +404,114 @@ bool intersectSomethingGoingToLight(vec3 origin, vec3 N_aux) {
 bool intersectSomething(vec3 origin, vec3 rayDirection, out vec3 intersection,
                         out vec3 N, out vec3 color, out vec3 reflectedColor,
                         out bool shadow) {
-  float dist[4];
+  float dist[1+noSpheres*2 + noCubes*2];
   vec3 V, L, R;
-  vec3 V2, N2, L2, V3, N3, L3, V4, N4, L4;
-  vec3 Ns[4], Vs[4], Ls[4], Rs[4];
+  //vec3 V2, N2, L2, V3, N3, L3, V4, N4, L4;
+  vec3 Ns[1+noSpheres*2 + noCubes*2], Vs[1+noSpheres*2 + noCubes*2], Ls[1+noSpheres*2 + noCubes*2], \
+      Rs[1+noSpheres*2 + noCubes*2];
   vec3 intersection1, intersection2, intersection3;
-  bool interBool[4] ;
-  vec3 inter[4] ;
+  bool interBool[1+noSpheres*2 + noCubes*2] ;
+  vec3 inter[1+noSpheres*2 + noCubes*2] ;
 
-  interBool[0] = intersectFloor(origin, rayDirection, inter[0], dist[0], Vs[0], Ns[0], Ls[0], reflectedColor); 
-  interBool[1] = intersectPlane(origin, rayDirection, inter[1], dist[1], Vs[1], Ns[1], Ls[1]) && \
-                (insideSphere(inter[1]) || insideCube(inter[1]));
-  interBool[2] = intersectCube(origin, rayDirection, inter[2], dist[2], Vs[2], Ns[2], Ls[2]) && \
-              !frontPlane(inter[2]);
-  interBool[3] = intersectSphere(origin, rayDirection, inter[3], dist[3], Vs[3], Ns[3], Ls[3]) && \
-              !frontPlane(inter[3]);
+  interBool[0] = intersectFloor(origin, rayDirection, inter[0], dist[0], Vs[0], Ns[0], Ls[0], \
+    reflectedColor); 
 
-  if(!interBool[0] && !interBool[1] && !interBool[2] && !interBool[3]){
+  interBool[1] = false;
+
+  
+
+  for (int i = 0; i < noSpheres; i++){
+    interBool[i+1] = intersectPlane(origin, rayDirection, sphereCenter[i], norPlane, inter[1+i], \
+                  dist[1+i], Vs[1+i], Ns[1+i], Ls[1+i]) && \
+                  insideSphere(inter[1+i], sphereCenter[i]);
+    interBool[1+noSpheres+i] = intersectSphere(origin, rayDirection, sphereCenter[i], inter[1+noSpheres+i], \
+                dist[1+noSpheres+i],  Vs[1+noSpheres+i], Ns[1+noSpheres+i], Ls[1+noSpheres+i]) && \
+                !frontPlane(inter[1+noSpheres+i], sphereCenter[i], norPlane);
+  }
+
+  
+  for (int i = 0; i < noCubes; i++){
+    interBool[1+noSpheres*2 +i] = intersectPlane(origin, rayDirection, cubeCenter[i], norPlane, \
+                  inter[1+noSpheres*2 +i], dist[1+noSpheres*2 +i], Vs[1+noSpheres*2 +i],  \
+                  Ns[1+noSpheres*2 +i], Ls[1+noSpheres*2 +i]) && \
+                  insideCube(inter[1+noSpheres*2 +i], cubeCenter[i]);
+
+    //interBool[1+noSpheres*2 +i] =false;
+
+    interBool[1+noSpheres*2 + noCubes+i] = intersectCube(origin, rayDirection, i, \
+                inter[1+noSpheres*2 + noCubes+i], dist[1+noSpheres*2 + noCubes+i], \
+                Vs[1+noSpheres*2 + noCubes+i], Ns[1+noSpheres*2 + noCubes+i], Ls[1+noSpheres*2 + noCubes+i]) 
+                && !frontPlane(inter[1+noSpheres*2 + noCubes+i], cubeCenter[i], norPlane);
+  }
+  
+  bool interBoolSol = true;
+  for (int i = 0; i < (1+noSpheres*2 + noCubes*2); i++){
+    interBoolSol = interBoolSol && !interBool[i];
+  }
+
+  if(interBoolSol){
     return false;
   }
 
+  
   float minDist = 1000.0;
-  for (int i = 0; i < 4; i++)
-  {
+  for (int i = 0; i < (1+noSpheres*2 + noCubes*2); i++){
     if(interBool[i] && (minDist > dist[i])){
       intersection = inter[i]+0.0001;
       N = Ns[i];
-      V = Vs[i];
-      L = Ls[i];
       if(i==0){
         color = reflectedColor;
       }else{
         if(mode == 0){
-          float noise = get_nearest_noise(intersection, 0.0, transPerlin, scalePerlin);
-        color = vec3(get_nearest_noise(intersection, -1.0, transPerlin, scalePerlin), noise, get_nearest_noise(intersection, 1.0, transPerlin, scalePerlin));
+          
+          float noise = get_nearest_noise(intersection, 0.0, transPerlin, scalePerlin, anglePerlin);
+          color = vec3(get_nearest_noise(intersection, -1.0, transPerlin, scalePerlin, anglePerlin), \
+                  noise, get_nearest_noise(intersection, 1.0, transPerlin, scalePerlin, anglePerlin));
         }else if(mode == 1){
-          float noise = bilinearNoise(intersection, 0.0, transPerlin, scalePerlin);
-          color = vec3(bilinearNoise(intersection, -1.0, transPerlin, scalePerlin), noise, bilinearNoise(intersection, 1.0, transPerlin, scalePerlin));
+          float noise = trilinearNoise(intersection, 0.0, transPerlin, scalePerlin, anglePerlin);
+          color = vec3(trilinearNoise(intersection, -1.0, transPerlin, scalePerlin, anglePerlin), \
+                  noise, trilinearNoise(intersection, 1.0, transPerlin, scalePerlin,anglePerlin));
         }else if(mode == 2){
           //marble
-          float noisex = bilinearNoise(intersection, 0.0, transPerlin, scalePerlin);
-          float noisey = bilinearNoise(intersection, 0.0, transPerlin, scalePerlin);
-          float noisez = bilinearNoise(intersection, 0.0, transPerlin, scalePerlin);
+          float noise = trilinearNoise(intersection, 0.0, transPerlin, scalePerlin, anglePerlin);
   
-          color = vec3(noisex, noisey, noisez);
+          color = vec3(noise, noise, noise);
         }else if(mode == 3){
           //Grass scale 60, 20, 60
-          float noisex = bilinearNoise(intersection, 0.0, transPerlin, scalePerlin);
-          float noisey = bilinearNoise(intersection, 0.0, transPerlin, scalePerlin);
-          float noisez = bilinearNoise(intersection, 0.0, transPerlin, scalePerlin);
+          float noise = trilinearNoise(intersection, 0.0, transPerlin, scalePerlin, anglePerlin);
 
-          color = (vec3(noisex*0.2, noisey*0.8, noisez*0.3)+0.1)*0.6;
+          color = (vec3(noise*0.2, noise*0.8, noise*0.3)+0.1)*0.6;
 
-          noisex = bilinearNoise(intersection, -1.0, transPerlin, scalePerlin);
-          noisey = bilinearNoise(intersection, -1.0, transPerlin, scalePerlin);
-          noisez = bilinearNoise(intersection, -1.0, transPerlin, scalePerlin);
-          color += (vec3(noisex*1.0, noisey*0.6, noisez*0.2)+0.1)*0.4;
+          noise = trilinearNoise(intersection, -1.0, transPerlin, scalePerlin, anglePerlin);
+          color += (vec3(noise*1.0, noise*0.6, noise*0.2)+0.1)*0.4;
         }else if(mode == 4){
           //Wood scale 4, 80, 4
-          float noisex = bilinearNoise(intersection, 1.0, transPerlin, scalePerlin);
-          float noisey = bilinearNoise(intersection, 1.0, transPerlin, scalePerlin);
-          float noisez = bilinearNoise(intersection, 1.0, transPerlin, scalePerlin);
+          float noise = trilinearNoise(intersection, 1.0, transPerlin, scalePerlin, anglePerlin);
 
-          color = (vec3(noisex*0.7+0.5, noisey*0.4+0.35, noisez*0.2+0.2))*0.8;
+          color = (vec3(noise*0.7+0.5, noise*0.4+0.35, noise*0.2+0.2))*0.8;
 
-          noisex = bilinearNoise(intersection, -1.0, transPerlin, scalePerlin);
-          noisey = bilinearNoise(intersection, -1.0, transPerlin, scalePerlin);
-          noisez = bilinearNoise(intersection, -0.2, transPerlin, scalePerlin);
-          color += (vec3(noisex*0.2+0.5, noisey*0.8+0.3, noisez*0.2+0.1))*0.2;
+          noise = trilinearNoise(intersection, -1.0, transPerlin, scalePerlin, anglePerlin);
+          color += (vec3(noise*0.2+0.5, noise*0.8+0.3, noise*0.2+0.1))*0.2;
+        }else if(mode == 5){
+          float noise = trilinearNoise(intersection, 0.0, transPerlin, scalePerlin, anglePerlin);
+          color = (vec3(noise)*weightPerlin1 + brightPerlin1);
+          
+        }else{
+          float noise = trilinearNoise(intersection, 1.0, transPerlin, scalePerlin, anglePerlin);
+          //1-(x*perlinParams[6,perNo]+perlinParams[3, perNo])
+          color = 1.0 - (vec3(noise)*weightPerlin1 + brightPerlin1);
+
+          noise = trilinearNoise(intersection, -1.0, transPerlin1, scalePerlin1, anglePerlin1);
+          color += 1.0 - (vec3(noise)*weightPerlin2 + brightPerlin2);
+
+          color = (color/2.0);
         }
       }
       minDist = dist[i];
     }
+    
   }
+  
 
   
   if (intersectSomethingGoingToLight(intersection, N)) {
@@ -442,13 +522,14 @@ bool intersectSomething(vec3 origin, vec3 rayDirection, out vec3 intersection,
   }
 
   shadow = false;
-  //R = reflect(L, N); 
-  //color = colorAt(reflectedColor, V, N, L, R);
-  //color = vec3(sin(intersection[0]), cos(2.0*intersection[1]), sin(3.0*intersection[2]));
+  
   return true;
 }
 
 void main() {
+  sphereCenter = vec3[](sphere1) ;
+  cubeCenter = vec3[](cube1) ;
+
   lightPosition = vec3(0.0, 20.0, 0.0);
   vec3 rayDirection = normalize(nearPosition - cameraPosition);
 
@@ -462,14 +543,17 @@ void main() {
   ks = 0.6;
   n = 15.0;
 
-  A = vec3(cubeCenter.x - cs/2.0, cubeCenter.y - cs/2.0,cubeCenter.z - cs/2.0);
-  B = vec3(A.x, A.y, A.z + cs);
-  C = vec3(A.x + cs, A.y, A.z + cs);
-  D = vec3(A.x + cs, A.y, A.z);
-  E = vec3(A.x, A.y + cs, A.z);
-  F = vec3(A.x, A.y + cs, A.z + cs);
-  G = vec3(A.x + cs, A.y + cs, A.z + cs);
-  H = vec3(A.x + cs, A.y + cs, A.z);
+  for(int i=0; i<noCubes; i++){
+    A[i] = vec3(cubeCenter[i].x - cs/2.0, cubeCenter[i].y - cs/2.0,cubeCenter[i].z - cs/2.0);
+    B[i] = vec3(A[i].x, A[i].y, A[i].z + cs);
+    C[i] = vec3(A[i].x + cs, A[i].y, A[i].z + cs);
+    D[i] = vec3(A[i].x + cs, A[i].y, A[i].z);
+    E[i] = vec3(A[i].x, A[i].y + cs, A[i].z);
+    F[i] = vec3(A[i].x, A[i].y + cs, A[i].z + cs);
+    G[i] = vec3(A[i].x + cs, A[i].y + cs, A[i].z + cs);
+    H[i] = vec3(A[i].x + cs, A[i].y + cs, A[i].z);
+  }
+ 
 
   Ii = vec3(1.0);
   
@@ -479,14 +563,14 @@ void main() {
 
   if (intersectSomething(cameraPosition, rayDirection, intersection1, N, color, reflectedColor,\
      shadow)) {
-    colorMax = (reflectedColor + vec3(0.7))/1.7;
-    
+    color += 0.3*tempColor ;
     rayDirection = reflect(rayDirection, N);
+
     if (intersectSomething(intersection1, rayDirection, intersection2, N, tempColor, \
         reflectedColor, shadow)) {
       color += 0.3*tempColor ;
-      colorMax = (reflectedColor + vec3(0.7))/1.7;
       rayDirection = reflect(rayDirection, N);
+
       if (intersectSomething(intersection2, rayDirection, intersection1, N, tempColor, \
             reflectedColor, shadow)) {
         color += 0.3*tempColor ;
