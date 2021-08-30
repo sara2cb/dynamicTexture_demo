@@ -4,7 +4,7 @@
     <meta charset="utf-8"/>
     <title>Ray tracing in WebGL</title>
 
-    
+    h
 		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
 		<link rel="stylesheet" type="text/css" href="webgl.css">
   </head>
@@ -16,16 +16,16 @@
     <div class="splitRight right">
 			<div class="centered">
         <div class="btn-group">
-          <label class="button" >
+          <label class="button">
             <input type="file" onchange="onImageChange(event)"/>
               File upload
           </label>
           <span id="fps_value">0</span> fps
           <table>
             <tr>
-              <th><p for="dirxL" style="margin-bottom:0;">DirX:</p></th>
-              <th><p for="diryL" style="margin-bottom:0;">DirY:</p></th>
-              <th><p for="dirzL" style="margin-bottom:0;">DirZ:</p></th>
+              <th><p for="dirxL">DirX:</p></th>
+              <th><p for="diryL">DirY:</p></th>
+              <th><p for="dirzL">DirZ:</p></th>
             </tr>
             <tr>
               <td><input type="number" id="dirx" name="dirx" value="0.0" ></td>
@@ -36,26 +36,20 @@
           
           <table>
             <tr>
-              <th><p for="camAngle" style="margin-bottom:0;">Camera Yº:</p></th>
-              <th><p for="camAngle" style="margin-bottom:0;">Camera Zº:</p></th>
+              <th><p for="camAngle">Camera Yº:</p></th>
+              <th><p for="camAngle">Camera Zº:</p></th>
             </tr>
             <tr>
               <td><input type="number" id="cam" name="cam" value="10" step="3"></td>
               <td><input type="number" id="camz" name="camz" value="-10" step="3"></td>
             </tr>
           </table>
-
+          
           <table>
             <tr>
-              <th><p id="PerlinTit" for="PerlinTit" style="margin-bottom:0;">Perlin parameters:</p></th>
-            </tr>
-          </table>
-
-          <table>
-            <tr>
-              <th><p for="perxScal" style="margin-bottom:0;">Scale X</p></th>
-              <th><p for="peryScal" style="margin-bottom:0;">Scale Y</p></th>
-              <th><p for="perzScal" style="margin-bottom:0;">Scale Z</p></th>
+              <th><p for="perxScal">Perlin Scale X:</p></th>
+              <th><p for="peryScal">Perlin Scale Y:</p></th>
+              <th><p for="perzScal">Perlin Scale Z:</p></th>
             </tr>
             <tr>
               <td><input type="number" id="perx" name="perx" value="1.0" min="0.0"  step="0.1"></td>
@@ -66,9 +60,9 @@
 
           <table>
             <tr>
-              <th><p for="perxScal" style="margin-bottom:0;">Xº</p></th>
-              <th><p for="peryScal" style="margin-bottom:0;">Yº</p></th>
-              <th><p for="perzScal" style="margin-bottom:0;">Zº</p></th>
+              <th><p for="perxScal">Perlin Xº:</p></th>
+              <th><p for="peryScal">Perlin Yº:</p></th>
+              <th><p for="perzScal">Perlin Zº:</p></th>
             </tr>
             <tr>
               <td><input type="number" id="perxrot" name="perxrot" value="0" min="0" step="10"></td>
@@ -79,9 +73,9 @@
 
           <table>
             <tr>
-              <th> <p for="perx" style="margin-bottom:0;">ShiftX</p></th>
-              <th> <p for="pery" style="margin-bottom:0;">ShiftY</p></th>
-              <th> <p for="perz" style="margin-bottom:0;">ShiftZ</p></th>
+              <th> <p for="perx">Perlin ShiftX:</p></th>
+              <th> <p for="pery">Perlin ShiftY:</p></th>
+              <th> <p for="perz">Perlin ShiftZ:</p></th>
             </tr>
             <tr>
               <td><input type="number" id="perxTr" name="perx" value="1.0" step="0.1"></td>
@@ -92,9 +86,9 @@
 
           <table>
             <tr>
-              <th> <p for="brR" style="margin-bottom:0;">Bright R</p></th>
-              <th> <p for="brG" style="margin-bottom:0;">Bright G</p></th>
-              <th> <p for="brB" style="margin-bottom:0;">Bright B</p></th>
+              <th> <p for="brR">Brightness R:</p></th>
+              <th> <p for="brG">Brightness G:</p></th>
+              <th> <p for="brB">Brightness B:</p></th>
             </tr>
             <tr>
               <td><input type="number" id="brR" name="brR" value="0.5" step="0.1" min="0.0" disabled="true"> </td>
@@ -105,9 +99,9 @@
 
           <table>
             <tr>
-              <th> <p for="wR" style="margin-bottom:0;">Weight R</p></th>
-              <th> <p for="wG" style="margin-bottom:0;">Weight G</p></th>
-              <th> <p for="wB" style="margin-bottom:0;">Weight B</p></th>
+              <th> <p for="wR">Weight R:</p></th>
+              <th> <p for="wG">Weight G:</p></th>
+              <th> <p for="wB">Weight B:</p></th>
             </tr>
             <tr>
               <td><input type="number" id="wR" name="wR" value="0.5" step="0.1" min="0.0" max="1" disabled="true"> </td>
@@ -119,17 +113,8 @@
           
 
           
-          
 
-          <p id="inferTime" for="inferTime">Time of inference: --</p>
-          <table>
-            <tr>
-              <td><label for="gridCheck">Grid floor</label><input type="checkbox" id="gridCheck" name="gridCheck" ></td>
-              <td><label for="reflectionCheck">Reflection</label><input type="checkbox" id="reflectionCheck" name="reflectionCheck" checked="true"></td>
-            </tr>
-          </table>
-
-          
+          <p for="mode">Mode</p>
           <select name="mode" id="mode">
             <option value="0">Perlin grid</option>
             <option value="1">perlin interpolated</option>
@@ -138,6 +123,10 @@
             <option value="4">wood</option>
             <option value="5">custom</option>
           </select>
+
+          <p id="inferTime" for="inferTime">Time of inference: --</p>
+          <p id="inferMem" for="inferTime">Memory of inference: --</p>
+
 
         </div>
       </div>

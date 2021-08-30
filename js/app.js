@@ -1,7 +1,7 @@
 /* global mat4 vec3 glMatrix vertexShaderCode fragmentShaderCode */
 // Load our model.
 const sess = new onnx.InferenceSession();
-const loadingModelPromise = sess.loadModel("./modelInput50.onnx");
+const loadingModelPromise = sess.loadModel("./Archive/myDesignModel_v.onnx");
 var gl;
 var scalePerlinFactor;
 var transPerlinFactor;
@@ -9,11 +9,18 @@ var anglePerlinFactor;
 var scalePerlinFactor1;
 var transPerlinFactor1;
 var anglePerlinFactor1;
+var scalePerlinFactor2;
+var transPerlinFactor2;
+var anglePerlinFactor2;
 
 var brightPerlin1;
 var brightPerlin2;
+var brightPerlin3;
+
 var weightPerlin1;
 var weightPerlin2;
+var weightPerlin3;
+var realImageOn = false;
 var modeSh;
 
 // Function that is called on load.
@@ -168,17 +175,25 @@ function initDemo() {
   scalePerlinFactor1 = gl.getUniformLocation(program, 'scalePerlin1');
   transPerlinFactor1 = gl.getUniformLocation(program, 'transPerlin1');
   anglePerlinFactor1 = gl.getUniformLocation(program, 'anglePerlin1');
+  scalePerlinFactor2 = gl.getUniformLocation(program, 'scalePerlin2');
+  transPerlinFactor2 = gl.getUniformLocation(program, 'transPerlin2');
+  anglePerlinFactor2 = gl.getUniformLocation(program, 'anglePerlin2');
+
 
   brightPerlin1 = gl.getUniformLocation(program, 'brightPerlin1');
   brightPerlin2 = gl.getUniformLocation(program, 'brightPerlin2');
+  brightPerlin3 = gl.getUniformLocation(program, 'brightPerlin3');
+
   weightPerlin1 = gl.getUniformLocation(program, 'weightPerlin1');
   weightPerlin2 = gl.getUniformLocation(program, 'weightPerlin2');
-
+  weightPerlin3 = gl.getUniformLocation(program, 'weightPerlin3');
 
   modeSh = gl.getUniformLocation(program, 'mode');
+  reflectionOn = gl.getUniformLocation(program, 'reflectingOn');
+  gridOn = gl.getUniformLocation(program, 'gridOn');
 
-  var sphereCenters = [[5.0, 2.5, 0.0], [3.0, 2.5, -5.0]];
-  var cubeCenters = [[-5.0, 2.5, 0.0], [-3.0, 2.5, -5.0]];
+  var sphereCenters = [[5.0, 2, 0.0], [3.0, 1.5, -5.0]];
+  var cubeCenters = [[-5.0, 2, 0.0], [-3.0, 1.5, -5.0]];
   
   var sphere1 = sphereCenters[0]
   var sphere2 = sphereCenters[1]
@@ -190,7 +205,6 @@ function initDemo() {
 
   gl.uniform3f(cubeCenterLocation1, cube1[0], cube1[1], cube1[2]);
   gl.uniform3f(cubeCenterLocation2, cube2[0], cube2[1], cube2[2]);
-
   
   gl.uniform1f(floorRadiusLocation, 20.0);
   gl.uniform3f(floorLocationLocation, 0.0, -1.0, 0.0);
@@ -201,6 +215,11 @@ function initDemo() {
 
   var prevMod = 0;
   gl.uniform1i(modeSh, 0);
+
+  var prevReflection = true;
+  gl.uniform1i(reflectionOn, true);
+  var prevGrid = false;
+  gl.uniform1i(gridOn, false);
 
   const up = vec3.fromValues(0.0, 1.0, 0.0);
   const cameraTo = vec3.fromValues(0.0, 0.0, 0.0);
@@ -222,57 +241,13 @@ function initDemo() {
   const fpsValueElem = document.getElementById('fps_value');
   let fps = 0;
 
+  var prevrealImageOn = false
+
   function renderLoop() {
-    var dirx = parseFloat(document.getElementById("dirx").value);
-    var diry = parseFloat(document.getElementById("diry").value);
-    var dirz = parseFloat(document.getElementById("dirz").value);
-    if(dirx != NaN && diry != NaN && dirz != NaN ){
-      gl.uniform3f(planeDirectionLocation, dirx, diry, dirz);
-    }
-    
-    var perlinx = parseFloat(document.getElementById("perx").value);
-    var perliny = parseFloat(document.getElementById("pery").value);
-    var perlinz = parseFloat(document.getElementById("perz").value);
-    if(perlinx != NaN && perliny != NaN && perlinz != NaN ){
-      gl.uniform3f(scalePerlinFactor, perlinx, perliny, perlinz);
-    }
-    var perlinxTr = parseFloat(document.getElementById("perxTr").value);
-    var perlinyTr = parseFloat(document.getElementById("peryTr").value);
-    var perlinzTr = parseFloat(document.getElementById("perzTr").value);
-    if(perlinxTr != NaN && perlinyTr != NaN && perlinzTr != NaN ){
-      gl.uniform3f(transPerlinFactor, perlinxTr, perlinyTr, perlinzTr);
-    }
-    var perlinx = parseFloat(document.getElementById("perxrot").value)*Math.PI/180;
-    var perliny = parseFloat(document.getElementById("peryrot").value)*Math.PI/180;
-    var perlinz = parseFloat(document.getElementById("perzrot").value)*Math.PI/180;
-    if(perlinx != NaN && perliny != NaN && perlinz != NaN ){
-      if(perlinx >= Math.PI*2 ){
-        document.getElementById("perxrot").value = 0.0
-      }if(perliny >= Math.PI*2 ){
-        document.getElementById("peryrot").value = 0.0
-      }if(perlinz >= Math.PI*2 ){
-        document.getElementById("perzrot").value = 0.0
-      }
-      gl.uniform3f(anglePerlinFactor, perlinx, perliny, perlinz);
-    }
 
-    var brR = parseFloat(document.getElementById("brR").value);
-    var brG = parseFloat(document.getElementById("brG").value);
-    var brB = parseFloat(document.getElementById("brB").value);
-    if(brR != NaN && brG != NaN && brB != NaN ){
-      gl.uniform3f(brightPerlin1, brR, brG, brB);
-    }
-
-    var wR = parseFloat(document.getElementById("wR").value);
-    var wG = parseFloat(document.getElementById("wG").value);
-    var wB = parseFloat(document.getElementById("wB").value);
-    if(wR != NaN && wG != NaN && wB != NaN ){
-      //console.log(wR, wG, wB)
-      gl.uniform3f(weightPerlin1, wR, wG, wB);
-    }
-
+    prevrealImageOn = realImageOn
     var modecur = parseFloat(document.getElementById("mode").value);
-    if(modecur != prevMod){
+    if(modecur != prevMod || prevrealImageOn == true){
       if(modecur == 0 || modecur == 1 ){
         document.getElementById("perx").value = 1.0
         document.getElementById("pery").value = 1.0
@@ -283,6 +258,13 @@ function initDemo() {
         document.getElementById("wR").disabled = true
         document.getElementById("wG").disabled = true
         document.getElementById("wB").disabled = true
+        document.getElementById("perx").disabled = false
+        document.getElementById("pery").disabled = false
+        document.getElementById("perz").disabled = false
+        document.getElementById("perxrot").disabled = false
+        document.getElementById("peryrot").disabled = false
+        document.getElementById("perzrot").disabled = false
+        realImageOn == false 
       }else if(modecur == 2){
         document.getElementById("perx").value = 10.0
         document.getElementById("pery").value = 10.0
@@ -293,6 +275,15 @@ function initDemo() {
         document.getElementById("wR").disabled = true
         document.getElementById("wG").disabled = true
         document.getElementById("wB").disabled = true
+
+        document.getElementById("perx").disabled = false
+        document.getElementById("pery").disabled = false
+        document.getElementById("perz").disabled = false
+        document.getElementById("perxrot").disabled = false
+        document.getElementById("peryrot").disabled = false
+        document.getElementById("perzrot").disabled = false
+
+        realImageOn == false 
       }else if(modecur == 3){
         document.getElementById("perx").value = 60.0
         document.getElementById("pery").value = 20.0
@@ -303,6 +294,15 @@ function initDemo() {
         document.getElementById("wR").disabled = true
         document.getElementById("wG").disabled = true
         document.getElementById("wB").disabled = true
+
+        document.getElementById("perx").disabled = false
+        document.getElementById("pery").disabled = false
+        document.getElementById("perz").disabled = false
+        document.getElementById("perxrot").disabled = false
+        document.getElementById("peryrot").disabled = false
+        document.getElementById("perzrot").disabled = false
+
+        realImageOn == false 
       }else if(modecur == 4){
         document.getElementById("perx").value = 4.0
         document.getElementById("pery").value = 80.0
@@ -313,6 +313,15 @@ function initDemo() {
         document.getElementById("wR").disabled = true
         document.getElementById("wG").disabled = true
         document.getElementById("wB").disabled = true
+
+        document.getElementById("perx").disabled = false
+        document.getElementById("pery").disabled = false
+        document.getElementById("perz").disabled = false
+        document.getElementById("perxrot").disabled = false
+        document.getElementById("peryrot").disabled = false
+        document.getElementById("perzrot").disabled = false
+
+        realImageOn == false 
       }else if(modecur == 5){
         document.getElementById("brR").disabled = false
         document.getElementById("brG").disabled = false
@@ -320,10 +329,114 @@ function initDemo() {
         document.getElementById("wR").disabled = false
         document.getElementById("wG").disabled = false
         document.getElementById("wB").disabled = false
+
+        document.getElementById("perx").disabled = false
+        document.getElementById("pery").disabled = false
+        document.getElementById("perz").disabled = false
+        document.getElementById("perxrot").disabled = false
+        document.getElementById("peryrot").disabled = false
+        document.getElementById("perzrot").disabled = false
+
+        realImageOn == false 
       }
       gl.uniform1i(modeSh, modecur)
       prevMod = modecur
+
+      if(prevrealImageOn == true ){
+        console.log("hello")
+        document.getElementById("perx").disabled = true
+        document.getElementById("pery").disabled = true
+        document.getElementById("perz").disabled = true
+        document.getElementById("perxrot").disabled = true
+        document.getElementById("peryrot").disabled = true
+        document.getElementById("perzrot").disabled = true
+
+        document.getElementById("brR").disabled = true
+        document.getElementById("brG").disabled = true
+        document.getElementById("brB").disabled = true
+        document.getElementById("wR").disabled = true
+        document.getElementById("wG").disabled = true
+        document.getElementById("wB").disabled = true
+
+        realImageOn = false
+        gl.uniform1i(modeSh, 10)
+      }
+      
     }
+
+    var grid = document.getElementById("gridCheck").checked
+    if(grid != prevGrid){
+      gl.uniform1i(gridOn, grid)
+    }
+    prevGrid = grid
+
+    var reflection = document.getElementById("reflectionCheck").checked
+    if(reflection != prevReflection){
+      gl.uniform1i(reflectionOn, reflection)
+    }
+    prevReflection = reflection
+
+
+
+    var dirx = parseFloat(document.getElementById("dirx").value);
+    var diry = parseFloat(document.getElementById("diry").value);
+    var dirz = parseFloat(document.getElementById("dirz").value);
+    if(dirx != NaN && diry != NaN && dirz != NaN ){
+      gl.uniform3f(planeDirectionLocation, dirx, diry, dirz);
+    }
+    if(!document.getElementById("perx").disabled &&  !document.getElementById("pery").disabled && !document.getElementById("perz").disabled){
+
+      var perlinx = parseFloat(document.getElementById("perx").value);
+      var perliny = parseFloat(document.getElementById("pery").value);
+      var perlinz = parseFloat(document.getElementById("perz").value);
+      if(perlinx != NaN && perliny != NaN && perlinz != NaN){
+        gl.uniform3f(scalePerlinFactor, perlinx, perliny, perlinz);
+      }
+    }
+    var perlinxTr = parseFloat(document.getElementById("perxTr").value);
+    var perlinyTr = parseFloat(document.getElementById("peryTr").value);
+    var perlinzTr = parseFloat(document.getElementById("perzTr").value);
+    if(perlinxTr != NaN && perlinyTr != NaN && perlinzTr != NaN ){
+      gl.uniform3f(transPerlinFactor, perlinxTr, perlinyTr, perlinzTr);
+    }
+
+    if(!document.getElementById("perxrot").disabled &&  !document.getElementById("peryrot").disabled && !document.getElementById("perzrot").disabled){
+
+      var perlinx = parseFloat(document.getElementById("perxrot").value)*Math.PI/180;
+      var perliny = parseFloat(document.getElementById("peryrot").value)*Math.PI/180;
+      var perlinz = parseFloat(document.getElementById("perzrot").value)*Math.PI/180;
+      if(perlinx != NaN && perliny != NaN && perlinz != NaN ){
+        if(perlinx >= Math.PI*2 ){
+          document.getElementById("perxrot").value = 0.0
+        }if(perliny >= Math.PI*2 ){
+          document.getElementById("peryrot").value = 0.0
+        }if(perlinz >= Math.PI*2 ){
+          document.getElementById("perzrot").value = 0.0
+        }
+        gl.uniform3f(anglePerlinFactor, perlinx, perliny, perlinz);
+      }
+    }
+
+    if(!document.getElementById("brR").disabled &&  !document.getElementById("brG").disabled && !document.getElementById("brB").disabled){
+      var brR = parseFloat(document.getElementById("brR").value);
+      var brG = parseFloat(document.getElementById("brG").value);
+      var brB = parseFloat(document.getElementById("brB").value);
+      if(brR != NaN && brG != NaN && brB != NaN){
+        gl.uniform3f(brightPerlin1, brR, brG, brB);
+      }
+    }
+
+    if(!document.getElementById("wR").disabled &&  !document.getElementById("wG").disabled && !document.getElementById("wB").disabled){
+      var wR = parseFloat(document.getElementById("wR").value);
+      var wG = parseFloat(document.getElementById("wG").value);
+      var wB = parseFloat(document.getElementById("wB").value);
+      if(wR != NaN && wG != NaN && wB != NaN ){
+        //console.log(wR, wG, wB)
+        gl.uniform3f(weightPerlin1, wR, wG, wB);
+      }
+    }
+
+
 
     // resize canvas in case window size has changed
     if (canvas.width !== window.innerWidth
@@ -425,31 +538,54 @@ async function updatePredictions() {
   console.log(input)
 
   console.log(1)
-  const outputMap = await sess.run([input]);
-  console.log(2)
-  const outputTensor = outputMap.values().next().value;
-  console.log(3)
-  const predictions = outputTensor.data;
-  console.log(predictions) ;
-  gl.uniform1i(modeSh, 10)
 
-  var scalePerlinFactor;
-var transPerlinFactor;
-var anglePerlinFactor;
+
+  var startMem = performance.memory.usedJSHeapSize;
+
+  var start = new Date().getTime();
+  const outputMap = await sess.run([input]);
+  var end = new Date().getTime();
+  var time = end - start;
+  var finMem = performance.memory.usedJSHeapSize - startMem;
+  document.getElementById("inferTime").innerHTML = "Time of inference: " + time + "ms"
+  document.getElementById("inferMem").innerHTML = "Memory of inference: " + finMem 
+
+  //console.log(outputMap.values())
+  const outputTensor = outputMap.values()
+  console.log(2)
+  var predictionsRGB = outputTensor.next().value.data;
+  var predictionsScale = outputTensor.next().value.data;
+  var predictionsAngle = outputTensor.next().value.data;
+  predictionsScale = predictionsScale.map(x => x * 1);
+  console.log(predictionsScale) ;
+  console.log(predictionsAngle) ;
+  console.log(predictionsRGB) ;
 
   gl.uniform3f(transPerlinFactor, 0,0,0);
   gl.uniform3f(transPerlinFactor1, 0,0,0);
 
-  gl.uniform3f(scalePerlinFactor, predictions[0],predictions[2],predictions[2]);
-  gl.uniform3f(scalePerlinFactor1, predictions[1],predictions[3],predictions[3]);
-  gl.uniform3f(anglePerlinFactor, predictions[6],predictions[6],predictions[6]);
-  gl.uniform3f(anglePerlinFactor1, predictions[7],predictions[7],predictions[7]);
 
-  gl.uniform3f(brightPerlin1, predictions[7],predictions[9],predictions[11]);
-  gl.uniform3f(brightPerlin2, predictions[8],predictions[10],predictions[12]);
-  gl.uniform3f(weightPerlin1, predictions[13],predictions[15],predictions[17]);
-  gl.uniform3f(weightPerlin2, predictions[14],predictions[18],predictions[18]);
   
+  gl.uniform3f(scalePerlinFactor, predictionsScale[0],predictionsScale[3],predictionsScale[0]);
+  gl.uniform3f(scalePerlinFactor1, predictionsScale[1],predictionsScale[4],predictionsScale[1]);
+  gl.uniform3f(scalePerlinFactor2, predictionsScale[2],predictionsScale[5],predictionsScale[2]);
+
+  gl.uniform3f(anglePerlinFactor, predictionsAngle[0],predictionsAngle[0],predictionsAngle[0]);
+  gl.uniform3f(anglePerlinFactor1, predictionsAngle[1],predictionsAngle[1],predictionsAngle[1]);
+  gl.uniform3f(anglePerlinFactor2, predictionsAngle[0],predictionsAngle[0],predictionsAngle[0]);
+
+  gl.uniform3f(brightPerlin1, predictionsRGB[0],predictionsRGB[3],predictionsRGB[6]);
+  gl.uniform3f(brightPerlin2, predictionsRGB[1],predictionsRGB[4],predictionsRGB[7]);
+  gl.uniform3f(brightPerlin3, predictionsRGB[2],predictionsRGB[5],predictionsRGB[8]);
+
+  gl.uniform3f(weightPerlin1, predictionsRGB[9],predictionsRGB[12],predictionsRGB[15]);
+  gl.uniform3f(weightPerlin2, predictionsRGB[10],predictionsRGB[13],predictionsRGB[16]);
+  gl.uniform3f(weightPerlin3, predictionsRGB[11],predictionsRGB[14],predictionsRGB[17]);
+
+
+  gl.uniform1i(modeSh, 10)
+  realImageOn = true
+
 }
 
 function onImageChange(event) {
@@ -484,7 +620,7 @@ function convertImage(image) {
   console.log(result[0][0])
   */
  console.log(result)
-  for (let y = 0; y < height; y++) {
+  /*for (let y = 0; y < height; y++) {
     //result[0][0].push([]);
     //result[0][1].push([]);
     //result[0][2].push([]);
@@ -496,6 +632,27 @@ function convertImage(image) {
       //result[0][2][y].push([]);
       result.push(data[0] / 255);
       result.push(data[1] / 255);
+      result.push(data[2] / 255);
+    }
+  }*/
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      let data = ctx.getImageData(x, y, 1, 1).data;
+      result.push(data[0] / 255);
+    }
+  }
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      let data = ctx.getImageData(x, y, 1, 1).data;
+      result.push(data[1] / 255);
+    }
+  }
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      let data = ctx.getImageData(x, y, 1, 1).data;
       result.push(data[2] / 255);
     }
   }

@@ -31,15 +31,23 @@ uniform vec3 anglePerlin;
 uniform vec3 scalePerlin1;
 uniform vec3 transPerlin1;
 uniform vec3 anglePerlin1;
+uniform vec3 scalePerlin2;
+uniform vec3 transPerlin2;
+uniform vec3 anglePerlin2;
+
 uniform vec3 brightPerlin1;
 uniform vec3 weightPerlin1;
 uniform vec3 brightPerlin2;
 uniform vec3 weightPerlin2;
+uniform vec3 brightPerlin3;
+uniform vec3 weightPerlin3;
 
 uniform vec3 floorLocation;
 uniform float floorRadius;
 
 uniform int mode;
+uniform bool reflectingOn;
+uniform bool gridOn;
 
 vec3 A[noCubes], B[noCubes], C[noCubes], D[noCubes], E[noCubes], F[noCubes], G[noCubes], H[noCubes];
 
@@ -218,12 +226,16 @@ bool intersectFloor(vec3 origin, vec3 rayDirection, out vec3 intersection,
   float z = origin.z + rayDirection.z * dist + floorLocation[2];
   if (x*x+ z*z > floorRadius*floorRadius  ) return false;
 
-  if(mod(x, 1.5) < 0.07 || mod(z, 1.5) < 0.07) color = vec3(1.0, 1.0, 1.0);
-  else color = vec3(0.5, 0.5, 0.5);
-  /*if (x < 0.0 && z < 0.0) color = vec3(0.5, 0.5, 0.5);
-  else if (x < 0.0 && z > 0.0) color = vec3(0.5, 0.5, 0.5);
-  else if (x > 0.0 && z < 0.0) color = vec3(0.5, 0.5, 0.5);
-  else if (x > 0.0 && z > 0.0) color = vec3(0.5, 0.5, 0.5);*/
+  if(gridOn){
+    if(mod(x, 1.5) < 0.07 || mod(z, 1.5) < 0.07) color = vec3(1.0, 1.0, 1.0);
+    else color = vec3(0.5, 0.5, 0.5);
+  }
+  else{
+    if (x < 0.0 && z < 0.0) color = vec3(1.0, 1.0, 0.0);
+    else if (x < 0.0 && z > 0.0) color = vec3(1.0, 0.0, 1.0);
+    else if (x > 0.0 && z < 0.0) color = vec3(0.0, 0.5, 0.5);
+    else if (x > 0.0 && z > 0.0) color = vec3(0.5, 0.5, 0.5);
+  }
 
   intersection = vec3(x, floorLocation[1], z);
   V = -rayDirection;
@@ -403,7 +415,7 @@ bool intersectSomethingGoingToLight(vec3 origin, vec3 N_aux) {
 
 bool intersectSomething(vec3 origin, vec3 rayDirection, out vec3 intersection,
                         out vec3 N, out vec3 color, out vec3 reflectedColor,
-                        out bool shadow) {
+                        out bool shadow, out bool isFloor) {
   float dist[1+noSpheres*2 + noCubes*2];
   vec3 V, L, R;
   //vec3 V2, N2, L2, V3, N3, L3, V4, N4, L4;
@@ -461,7 +473,9 @@ bool intersectSomething(vec3 origin, vec3 rayDirection, out vec3 intersection,
       N = Ns[i];
       if(i==0){
         color = reflectedColor;
+        isFloor = true;
       }else{
+        isFloor = false;
         if(mode == 0){
           
           float noise = get_nearest_noise(intersection, 0.0, transPerlin, scalePerlin, anglePerlin);
@@ -498,13 +512,16 @@ bool intersectSomething(vec3 origin, vec3 rayDirection, out vec3 intersection,
           
         }else{
           float noise = trilinearNoise(intersection, 1.0, transPerlin, scalePerlin, anglePerlin);
-          //1-(x*perlinParams[6,perNo]+perlinParams[3, perNo])
           color = 1.0 - (vec3(noise)*weightPerlin1 + brightPerlin1);
 
           noise = trilinearNoise(intersection, -1.0, transPerlin1, scalePerlin1, anglePerlin1);
           color += 1.0 - (vec3(noise)*weightPerlin2 + brightPerlin2);
 
-          color = (color/2.0);
+          noise = trilinearNoise(intersection, -1.0, transPerlin2, scalePerlin2, anglePerlin2);
+          color += 1.0 - (vec3(noise)*weightPerlin3 + brightPerlin3);
+
+
+          color = (color/3.0);
         }
       }
       minDist = dist[i];
@@ -560,19 +577,28 @@ void main() {
   vec3 color, tempColor, colorMax, reflectedColor;
   vec3 N;
   bool shadow = false;
+  bool isFloor;
 
   if (intersectSomething(cameraPosition, rayDirection, intersection1, N, color, reflectedColor,\
-     shadow)) {
+     shadow, isFloor)) {
     color += 0.3*tempColor ;
     rayDirection = reflect(rayDirection, N);
 
-    if (intersectSomething(intersection1, rayDirection, intersection2, N, tempColor, \
-        reflectedColor, shadow)) {
+    if(reflectingOn){
+      isFloor = true;
+    }
+
+    if (isFloor && intersectSomething(intersection1, rayDirection, intersection2, N, tempColor, \
+        reflectedColor, shadow, isFloor)) {
       color += 0.3*tempColor ;
       rayDirection = reflect(rayDirection, N);
 
-      if (intersectSomething(intersection2, rayDirection, intersection1, N, tempColor, \
-            reflectedColor, shadow)) {
+      if(reflectingOn){
+        isFloor = true;
+      }
+
+      if (isFloor && intersectSomething(intersection2, rayDirection, intersection1, N, tempColor, \
+            reflectedColor, shadow, isFloor)) {
         color += 0.3*tempColor ;
       }
     }

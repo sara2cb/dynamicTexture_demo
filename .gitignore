@@ -2,3 +2,9 @@
 *.png
 *.jpg
 *.jpeg
+*.eps
+*.svg
+DissFigures/*
+Master dissertation/*
+oldONNX/*
+Archive*
