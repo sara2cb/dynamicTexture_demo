@@ -11,10 +11,11 @@ precision highp float;
 
 out vec4 fragColor;
 
+//Camera variables
 in vec3 nearPosition;
-
 uniform vec3 cameraPosition;
 
+//Shapes variables
 uniform vec3 sphere1;
 uniform vec3 sphere2;
 vec3 sphereCenter[noSpheres] ;
@@ -22,8 +23,15 @@ vec3 sphereCenter[noSpheres] ;
 uniform vec3 cube1;
 uniform vec3 cube2;
 vec3 cubeCenter[noCubes] ;
+vec3 A[noCubes], B[noCubes], C[noCubes], D[noCubes], E[noCubes], F[noCubes], G[noCubes], H[noCubes];
+vec3 Ii;
+float ka, kd, ks;
+float n;
 
+uniform vec3 floorLocation;
+uniform float floorRadius;
 
+//Perlin parameters
 uniform vec3 norPlane;
 uniform vec3 scalePerlin;
 uniform vec3 transPerlin;
@@ -42,23 +50,14 @@ uniform vec3 weightPerlin2;
 uniform vec3 brightPerlin3;
 uniform vec3 weightPerlin3;
 
-uniform vec3 floorLocation;
-uniform float floorRadius;
-
+//Mode variables
 uniform int mode;
 uniform bool reflectingOn;
 uniform bool gridOn;
 
-vec3 A[noCubes], B[noCubes], C[noCubes], D[noCubes], E[noCubes], F[noCubes], G[noCubes], H[noCubes];
-
-
+//Light parameters
 float cs;
-
 vec3 lightPosition;
-  
-vec3 Ii;
-float ka, kd, ks;
-float n;
 
 vec3 rotate(vec3 origin, vec3 point, vec3 angle){
     /*
@@ -201,8 +200,6 @@ bool intersectSphere(vec3 origin, vec3 rayDirection, vec3 sphereCenter, out vec3
   if (b < 0.0) return false;
   float d = sqrt( dot(rayToSphere, rayToSphere) - b * b);
   if (d > 2.5) return false;
-
-  
 
   dist = b - sqrt(2.5*2.5 - d*d);
   if (dist < 0.0) return false;
@@ -379,7 +376,6 @@ bool frontPlane(vec3 origin, vec3 origPlane, vec3 norPlane) {
 vec3 colorAt(vec3 color, vec3 V, vec3 N, vec3 L, vec3 R) {
   vec3 rColor = 
     ka * color + (kd * dot(L, N) + ks * pow(dot(V, R), n)) * Ii;
-
   return rColor;
 }
 
@@ -418,20 +414,19 @@ bool intersectSomething(vec3 origin, vec3 rayDirection, out vec3 intersection,
                         out bool shadow, out bool isFloor) {
   float dist[1+noSpheres*2 + noCubes*2];
   vec3 V, L, R;
-  //vec3 V2, N2, L2, V3, N3, L3, V4, N4, L4;
   vec3 Ns[1+noSpheres*2 + noCubes*2], Vs[1+noSpheres*2 + noCubes*2], Ls[1+noSpheres*2 + noCubes*2], \
       Rs[1+noSpheres*2 + noCubes*2];
   vec3 intersection1, intersection2, intersection3;
   bool interBool[1+noSpheres*2 + noCubes*2] ;
   vec3 inter[1+noSpheres*2 + noCubes*2] ;
 
+  //Check intersection with floor
   interBool[0] = intersectFloor(origin, rayDirection, inter[0], dist[0], Vs[0], Ns[0], Ls[0], \
     reflectedColor); 
 
   interBool[1] = false;
 
-  
-
+  //Check sphere intersection
   for (int i = 0; i < noSpheres; i++){
     interBool[i+1] = intersectPlane(origin, rayDirection, sphereCenter[i], norPlane, inter[1+i], \
                   dist[1+i], Vs[1+i], Ns[1+i], Ls[1+i]) && \
@@ -441,14 +436,12 @@ bool intersectSomething(vec3 origin, vec3 rayDirection, out vec3 intersection,
                 !frontPlane(inter[1+noSpheres+i], sphereCenter[i], norPlane);
   }
 
-  
+  //Check cube intersection
   for (int i = 0; i < noCubes; i++){
     interBool[1+noSpheres*2 +i] = intersectPlane(origin, rayDirection, cubeCenter[i], norPlane, \
                   inter[1+noSpheres*2 +i], dist[1+noSpheres*2 +i], Vs[1+noSpheres*2 +i],  \
                   Ns[1+noSpheres*2 +i], Ls[1+noSpheres*2 +i]) && \
                   insideCube(inter[1+noSpheres*2 +i], cubeCenter[i]);
-
-    //interBool[1+noSpheres*2 +i] =false;
 
     interBool[1+noSpheres*2 + noCubes+i] = intersectCube(origin, rayDirection, i, \
                 inter[1+noSpheres*2 + noCubes+i], dist[1+noSpheres*2 + noCubes+i], \
@@ -456,61 +449,65 @@ bool intersectSomething(vec3 origin, vec3 rayDirection, out vec3 intersection,
                 && !frontPlane(inter[1+noSpheres*2 + noCubes+i], cubeCenter[i], norPlane);
   }
   
+  //Return if there was no interesection
   bool interBoolSol = true;
   for (int i = 0; i < (1+noSpheres*2 + noCubes*2); i++){
     interBoolSol = interBoolSol && !interBool[i];
-  }
-
-  if(interBoolSol){
+  }if(interBoolSol){
     return false;
   }
 
-  
+  //Set pixel colour
   float minDist = 1000.0;
   for (int i = 0; i < (1+noSpheres*2 + noCubes*2); i++){
     if(interBool[i] && (minDist > dist[i])){
-      intersection = inter[i]+0.0001;
+      intersection = inter[i]+0.0001; //Prevention of self intersection
       N = Ns[i];
+      //Floor case
       if(i==0){
         color = reflectedColor;
         isFloor = true;
       }else{
         isFloor = false;
+        
         if(mode == 0){
-          
+          //Perlin grid
           float noise = get_nearest_noise(intersection, 0.0, transPerlin, scalePerlin, anglePerlin);
           color = vec3(get_nearest_noise(intersection, -1.0, transPerlin, scalePerlin, anglePerlin), \
                   noise, get_nearest_noise(intersection, 1.0, transPerlin, scalePerlin, anglePerlin));
+
         }else if(mode == 1){
+          //Grid interpolation
           float noise = trilinearNoise(intersection, 0.0, transPerlin, scalePerlin, anglePerlin);
           color = vec3(trilinearNoise(intersection, -1.0, transPerlin, scalePerlin, anglePerlin), \
                   noise, trilinearNoise(intersection, 1.0, transPerlin, scalePerlin,anglePerlin));
+
         }else if(mode == 2){
           //marble
           float noise = trilinearNoise(intersection, 0.0, transPerlin, scalePerlin, anglePerlin);
-  
           color = vec3(noise, noise, noise);
+
         }else if(mode == 3){
           //Grass scale 60, 20, 60
           float noise = trilinearNoise(intersection, 0.0, transPerlin, scalePerlin, anglePerlin);
-
           color = (vec3(noise*0.2, noise*0.8, noise*0.3)+0.1)*0.6;
-
           noise = trilinearNoise(intersection, -1.0, transPerlin, scalePerlin, anglePerlin);
           color += (vec3(noise*1.0, noise*0.6, noise*0.2)+0.1)*0.4;
+
         }else if(mode == 4){
           //Wood scale 4, 80, 4
           float noise = trilinearNoise(intersection, 1.0, transPerlin, scalePerlin, anglePerlin);
-
           color = (vec3(noise*0.7+0.5, noise*0.4+0.35, noise*0.2+0.2))*0.8;
-
           noise = trilinearNoise(intersection, -1.0, transPerlin, scalePerlin, anglePerlin);
           color += (vec3(noise*0.2+0.5, noise*0.8+0.3, noise*0.2+0.1))*0.2;
+
         }else if(mode == 5){
+          //Custom mode
           float noise = trilinearNoise(intersection, 0.0, transPerlin, scalePerlin, anglePerlin);
           color = (vec3(noise)*weightPerlin1 + brightPerlin1);
           
         }else{
+          //Model inference
           float noise = trilinearNoise(intersection, 1.0, transPerlin, scalePerlin, anglePerlin);
           color = 1.0 - (vec3(noise)*weightPerlin1 + brightPerlin1);
 
@@ -520,7 +517,6 @@ bool intersectSomething(vec3 origin, vec3 rayDirection, out vec3 intersection,
           noise = trilinearNoise(intersection, -1.0, transPerlin2, scalePerlin2, anglePerlin2);
           color += 1.0 - (vec3(noise)*weightPerlin3 + brightPerlin3);
 
-
           color = (color/3.0);
         }
       }
@@ -529,27 +525,24 @@ bool intersectSomething(vec3 origin, vec3 rayDirection, out vec3 intersection,
     
   }
   
-
-  
+  //Set shadow
   if (intersectSomethingGoingToLight(intersection, N)) {
-    //reflectedColor = 0.5*color;
     color = 0.5*color;
     shadow = true;
     return true;
   }
-
   shadow = false;
-  
+
   return true;
 }
 
 void main() {
+  //Initialise variable
   sphereCenter = vec3[](sphere1) ;
   cubeCenter = vec3[](cube1) ;
 
   lightPosition = vec3(0.0, 20.0, 0.0);
   vec3 rayDirection = normalize(nearPosition - cameraPosition);
-
 
   vec3 intersection1, intersection2;
 
@@ -579,6 +572,7 @@ void main() {
   bool shadow = false;
   bool isFloor;
 
+  //RAytracing algorithm
   if (intersectSomething(cameraPosition, rayDirection, intersection1, N, color, reflectedColor,\
      shadow, isFloor)) {
     color += 0.3*tempColor ;
