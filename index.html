@@ -28,9 +28,9 @@
               <th><p for="dirzL" style="margin-bottom:0;">DirZ:</p></th>
             </tr>
             <tr>
-              <td><input type="number" id="dirx" name="dirx" value="0.0" ></td>
-              <td><input type="number" id="diry" name="diry" value="1.0" ></td>
-              <td><input type="number" id="dirz" name="dirz" value="1.0" ></td>
+              <td><input type="number" id="dirx" name="dirx" value="0.0" step="0.25"></td>
+              <td><input type="number" id="diry" name="diry" value="1.0" step="0.25" ></td>
+              <td><input type="number" id="dirz" name="dirz" value="1.0" step="0.25" ></td>
             </tr>
           </table>
           
@@ -71,17 +71,17 @@
               <th><p for="perzScal" style="margin-bottom:0;">Zº</p></th>
             </tr>
             <tr>
-              <td><input type="number" id="perxrot" name="perxrot" value="0" min="0" step="10"></td>
-              <td><input type="number" id="peryrot" name="peryrot" value="0" min="0" step="10"></td>
-              <td><input type="number" id="perzrot" name="perzrot" value="0" min="0" step="10"></td>
+              <td><input type="number" id="perxrot" name="perxrot" value="0" min="0" step="5"></td>
+              <td><input type="number" id="peryrot" name="peryrot" value="0" min="0" step="5"></td>
+              <td><input type="number" id="perzrot" name="perzrot" value="0" min="0" step="5"></td>
             </tr>
           </table>
 
           <table>
             <tr>
-              <th> <p for="perx" style="margin-bottom:0;">ShiftX</p></th>
-              <th> <p for="pery" style="margin-bottom:0;">ShiftY</p></th>
-              <th> <p for="perz" style="margin-bottom:0;">ShiftZ</p></th>
+              <th> <p for="perx" style="margin-bottom:0;">Shift X</p></th>
+              <th> <p for="pery" style="margin-bottom:0;">Shift Y</p></th>
+              <th> <p for="perz" style="margin-bottom:0;">Shift Z</p></th>
             </tr>
             <tr>
               <td><input type="number" id="perxTr" name="perx" value="1.0" step="0.1"></td>
@@ -124,7 +124,7 @@
           <p id="inferTime" for="inferTime">Time of inference: --</p>
           <table>
             <tr>
-              <td><label for="gridCheck">Grid floor</label><input type="checkbox" id="gridCheck" name="gridCheck" ></td>
+              <td><label for="gridCheck">Grid floor</label><input type="checkbox" id="gridCheck" name="gridCheck" checked="true"></td>
               <td><label for="reflectionCheck">Reflection</label><input type="checkbox" id="reflectionCheck" name="reflectionCheck" checked="true"></td>
             </tr>
           </table>

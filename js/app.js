@@ -1,7 +1,7 @@
 /* global mat4 vec3 glMatrix vertexShaderCode fragmentShaderCode */
 // Load our model.
 const sess = new onnx.InferenceSession();
-const loadingModelPromise = sess.loadModel("./Archive/myDesignModel_v.onnx");
+const loadingModelPromise = sess.loadModel("./myDesignModel_v.onnx");
 var gl;
 var scalePerlinFactor;
 var transPerlinFactor;
@@ -218,8 +218,8 @@ function initDemo() {
 
   var prevReflection = true;
   gl.uniform1i(reflectionOn, true);
-  var prevGrid = false;
-  gl.uniform1i(gridOn, false);
+  var prevGrid = true;
+  gl.uniform1i(gridOn, true);
 
   const up = vec3.fromValues(0.0, 1.0, 0.0);
   const cameraTo = vec3.fromValues(0.0, 0.0, 0.0);
@@ -540,15 +540,12 @@ async function updatePredictions() {
   console.log(1)
 
 
-  var startMem = performance.memory.usedJSHeapSize;
 
   var start = new Date().getTime();
   const outputMap = await sess.run([input]);
   var end = new Date().getTime();
   var time = end - start;
-  var finMem = performance.memory.usedJSHeapSize - startMem;
   document.getElementById("inferTime").innerHTML = "Time of inference: " + time + "ms"
-  document.getElementById("inferMem").innerHTML = "Memory of inference: " + finMem 
 
   //console.log(outputMap.values())
   const outputTensor = outputMap.values()
@@ -556,7 +553,7 @@ async function updatePredictions() {
   var predictionsRGB = outputTensor.next().value.data;
   var predictionsScale = outputTensor.next().value.data;
   var predictionsAngle = outputTensor.next().value.data;
-  predictionsScale = predictionsScale.map(x => x * 1);
+  predictionsScale = predictionsScale.map(x => x * 2);
   console.log(predictionsScale) ;
   console.log(predictionsAngle) ;
   console.log(predictionsRGB) ;
