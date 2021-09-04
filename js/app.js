@@ -168,6 +168,8 @@ function initDemo() {
   const floorLocationLocation = gl.getUniformLocation(program, 'floorLocation');
   const planeDirectionLocation = gl.getUniformLocation(program, 'norPlane');
 
+  const lighPosLocation = gl.getUniformLocation(program, 'lightPos');
+
   //Set Perlin parameters
   scalePerlinFactor = gl.getUniformLocation(program, 'scalePerlin');
   transPerlinFactor = gl.getUniformLocation(program, 'transPerlin');
@@ -193,21 +195,20 @@ function initDemo() {
   gridOn = gl.getUniformLocation(program, 'gridOn');
 
   //Set geometry locations
-  var sphereCenters = [[5.0, 2, 0.0], [3.0, 1.5, -5.0]];
-  var cubeCenters = [[-5.0, 2, 0.0], [-3.0, 1.5, -5.0]];
-  var sphere1 = sphereCenters[0]
-  var sphere2 = sphereCenters[1]
-  var cube1 = cubeCenters[0]
-  var cube2 = cubeCenters[1]
+  var sphere1 = [5.0, 2, 0.0]
+  var cube1 = [-5.0, 2, 0.0]
 
   gl.uniform3f(sphereCenterLocation1, sphere1[0], sphere1[1], sphere1[2]);
-  gl.uniform3f(sphereCenterLocation2, sphere2[0], sphere2[1], sphere2[2]);
+  //gl.uniform3f(sphereCenterLocation2, sphere2[0], sphere2[1], sphere2[2]);
 
   gl.uniform3f(cubeCenterLocation1, cube1[0], cube1[1], cube1[2]);
-  gl.uniform3f(cubeCenterLocation2, cube2[0], cube2[1], cube2[2]);
+  //gl.uniform3f(cubeCenterLocation2, cube2[0], cube2[1], cube2[2]);
   
-  gl.uniform1f(floorRadiusLocation, 20.0);
+  gl.uniform1f(floorRadiusLocation, 30.0);
   gl.uniform3f(floorLocationLocation, 0.0, -1.0, 0.0);
+
+  var lightPos =[0, 9, 10]
+  gl.uniform3f(lighPosLocation, lightPos[0], lightPos[1], lightPos[2]);
 
   gl.uniform3f(scalePerlinFactor, 1.0,1.0,1.0);
   gl.uniform3f(transPerlinFactor, 1.0,1.0,1.0);

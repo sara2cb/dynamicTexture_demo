@@ -15,6 +15,9 @@ out vec4 fragColor;
 in vec3 nearPosition;
 uniform vec3 cameraPosition;
 
+//Light variables
+uniform vec3 lightPos;
+
 //Shapes variables
 uniform vec3 sphere1;
 uniform vec3 sphere2;
@@ -190,6 +193,123 @@ float  trilinearNoise(vec3 position, float seed, vec3 trans, vec3 scale, vec3 ro
   }
 
   return noise;
+}
+
+void sortT(inout float t1, inout float t2) {
+  // Make t1 the smaller t
+  if(t2 < t1)  {
+    float temp = t1;
+    t1 = t2;
+    t2 = temp;
+  }
+}
+
+bool isTInInterval(const float t, const float tMin, const float tMax) {
+  return t > tMin && t < tMax;
+}
+
+
+bool getSmallestTInInterval(float t0, float t1, const float tMin, const float tMax, 
+                          out float smallestTInInterval) {
+  
+  sortT(t0, t1);
+  
+  // As t0 is smaller, test this first
+  if(isTInInterval(t0, tMin, tMax)) {
+  	smallestTInInterval = t0;
+    return true;
+  }
+  
+  // If t0 was not in the interval, still t1 could be
+  if(isTInInterval(t1, tMin, tMax)) {
+  	smallestTInInterval = t1;
+    return true;
+  }  
+  
+  // None was
+  return false;
+}
+
+bool intersectCylinder(vec3 origin, vec3 rayDirection, vec3 cylinderCenter, vec3 cylinderDir, 
+                        float cylinderRadius, out vec3 intersection, out float dist, 
+                        out vec3 V, out vec3 N, out vec3 L){
+
+  vec3 toCylinder = origin - cylinderCenter;  
+
+  //Find t we need to solve the systems of equations
+  vec3 Avec = rayDirection - (dot(rayDirection, cylinderDir)*cylinderDir);
+
+	float A = dot(Avec, Avec);
+	float B = 2.0 * dot(rayDirection - dot(rayDirection, cylinderDir)*cylinderDir, 
+				   toCylinder - dot(origin, cylinderDir) * cylinderDir);
+
+	vec3 Cvec = toCylinder - dot(toCylinder, cylinderDir) * cylinderDir;
+
+	float C = dot(Cvec, Cvec) - cylinderRadius * cylinderRadius;
+	
+	float insideSquareRoot = B*B - 4.0*A*C;
+
+  if(insideSquareRoot <0.0){
+		return false;
+	}
+  //Ray tangent or parallel to the cylinder
+	else if(insideSquareRoot == 0.0){
+		//Ray and cylinder are parallel, no intersection.
+		if(cylinderDir == rayDirection || cylinderDir == -rayDirection){
+			return false;
+		}
+		
+		//Ray tangent to the cylinder
+		float t = (-B)/(2.0*A);
+
+		//Finding position by solving ray equation
+		intersection = origin + rayDirection*t;
+
+		//We find the normal of the cylinder 
+		// through the intersection point
+		N = normalize(intersection - (cylinderCenter + dot((intersection - cylinderCenter), 
+                  cylinderDir) * cylinderDir));
+
+    dist = length(intersection - origin);
+    V = -rayDirection;
+    L = normalize(lightPosition - intersection);
+
+		return true;
+	}
+  //Ray entering the cylinder
+	else{
+		//Finding the point closest to the ray
+		float t0 = (-B+sqrt(insideSquareRoot))/(2.0*A);
+		float t1 = (-B-sqrt(insideSquareRoot))/(2.0*A);
+		float smallestTInInterval;
+		if(!getSmallestTInInterval(t0, t1, 0.0, 1000.0, smallestTInInterval)) {
+      //Intersection too close or too far from the ray
+      return false;
+    }
+
+		intersection = origin + rayDirection*smallestTInInterval;
+		
+		//To find if ray origin is inside the cylinder,
+		vec3 vectorOriginPerpendicularCylinder = origin - (cylinderCenter + 
+												dot( (origin - cylinderCenter) , cylinderDir) 
+												* cylinderDir);
+		
+		//We find the normal of the  cylinder 
+		vec3 normalGeneral = intersection - (cylinderCenter + 
+                          dot((intersection - cylinderCenter), cylinderDir) * cylinderDir);
+		
+		//Set the direction of the normal correctly depending if the ray origin is inside 
+		N = length(vectorOriginPerpendicularCylinder) < cylinderRadius + 0.001 ? 
+          	- normalize(normalGeneral): normalize(normalGeneral);
+		
+    dist = length(intersection - origin);
+    V = -rayDirection;
+    L = normalize(lightPosition - intersection);
+
+		return true;
+			
+	}
+  return false;
 }
 
 bool intersectSphere(vec3 origin, vec3 rayDirection, vec3 sphereCenter, out vec3 intersection,
@@ -386,21 +506,31 @@ bool intersectSomethingGoingToLight(vec3 origin, vec3 N_aux) {
   if (dot(N_aux, rayDirection) < 0.0) return false;
 
   vec3 intersection;
-  float dist;
+  float dist, distBef;
   vec3 V, N, L;
 
   for(int i; i < noCubes; i++){
-    bool interCube = intersectCube(origin, rayDirection, i, intersection, dist, V,N,L) && \
+    bool interCube = intersectCube(origin, rayDirection, i, intersection, distBef, V,N,L) && \
                 !frontPlane(intersection, cubeCenter[i], norPlane);
+
+    bool interPlane =  intersectPlane(origin, rayDirection, cubeCenter[i], norPlane, intersection, \
+                  dist, V, N, L) && insideCube(intersection, cubeCenter[i]);
     if (interCube){
+      if (distBef < distToLight) return true;
+    }else if(interPlane){
       if (dist < distToLight) return true;
     }
   }
 
   for(int i; i < noSpheres; i++){
-    bool interSphere = intersectSphere(origin, rayDirection, sphereCenter[i], intersection, dist, V,N,L) && \
+    bool interSphere = intersectSphere(origin, rayDirection, sphereCenter[i], intersection, distBef, V,N,L) && \
               !frontPlane(intersection, sphereCenter[i], norPlane);
+
+    bool interPlane =  intersectPlane(origin, rayDirection, sphereCenter[i], norPlane, intersection, \
+                dist, V, N, L) && insideSphere(intersection, sphereCenter[i]);
     if (interSphere){
+      if (distBef < distToLight) return true;
+    }else if(interPlane){
       if (dist < distToLight) return true;
     }
   }
@@ -411,29 +541,33 @@ bool intersectSomethingGoingToLight(vec3 origin, vec3 N_aux) {
 
 bool intersectSomething(vec3 origin, vec3 rayDirection, out vec3 intersection,
                         out vec3 N, out vec3 color, out vec3 reflectedColor,
-                        out bool shadow, out bool isFloor) {
-  float dist[1+noSpheres*2 + noCubes*2];
+                        out bool shadow, out bool isFloor, out bool isBack) {
+  
+  const int maxInterI = 2+noSpheres*2 + noCubes*2;
+  float dist[maxInterI];
   vec3 V, L, R;
-  vec3 Ns[1+noSpheres*2 + noCubes*2], Vs[1+noSpheres*2 + noCubes*2], Ls[1+noSpheres*2 + noCubes*2], \
-      Rs[1+noSpheres*2 + noCubes*2];
+  vec3 Ns[maxInterI], Vs[maxInterI], Ls[maxInterI], \
+      Rs[maxInterI];
   vec3 intersection1, intersection2, intersection3;
-  bool interBool[1+noSpheres*2 + noCubes*2] ;
-  vec3 inter[1+noSpheres*2 + noCubes*2] ;
+  bool interBool[maxInterI] ;
+  vec3 inter[maxInterI] ;
 
   //Check intersection with floor
   interBool[0] = intersectFloor(origin, rayDirection, inter[0], dist[0], Vs[0], Ns[0], Ls[0], \
     reflectedColor); 
 
-  interBool[1] = false;
 
   //Check sphere intersection
   for (int i = 0; i < noSpheres; i++){
     interBool[i+1] = intersectPlane(origin, rayDirection, sphereCenter[i], norPlane, inter[1+i], \
                   dist[1+i], Vs[1+i], Ns[1+i], Ls[1+i]) && \
                   insideSphere(inter[1+i], sphereCenter[i]);
-    interBool[1+noSpheres+i] = intersectSphere(origin, rayDirection, sphereCenter[i], inter[1+noSpheres+i], \
-                dist[1+noSpheres+i],  Vs[1+noSpheres+i], Ns[1+noSpheres+i], Ls[1+noSpheres+i]) && \
-                !frontPlane(inter[1+noSpheres+i], sphereCenter[i], norPlane);
+
+    
+    interBool[1+noSpheres+i] = intersectSphere(origin, rayDirection, sphereCenter[i], \
+                inter[1+noSpheres+i], dist[1+noSpheres+i],  Vs[1+noSpheres+i], Ns[1+noSpheres+i], \
+                Ls[1+noSpheres+i]) \
+                && !frontPlane(inter[1+noSpheres+i], sphereCenter[i], norPlane);
   }
 
   //Check cube intersection
@@ -445,13 +579,19 @@ bool intersectSomething(vec3 origin, vec3 rayDirection, out vec3 intersection,
 
     interBool[1+noSpheres*2 + noCubes+i] = intersectCube(origin, rayDirection, i, \
                 inter[1+noSpheres*2 + noCubes+i], dist[1+noSpheres*2 + noCubes+i], \
-                Vs[1+noSpheres*2 + noCubes+i], Ns[1+noSpheres*2 + noCubes+i], Ls[1+noSpheres*2 + noCubes+i]) 
+                Vs[1+noSpheres*2 + noCubes+i], Ns[1+noSpheres*2 + noCubes+i], \
+                Ls[1+noSpheres*2 + noCubes+i]) \
                 && !frontPlane(inter[1+noSpheres*2 + noCubes+i], cubeCenter[i], norPlane);
   }
+
+  //Check intersection with background
+  interBool[maxInterI-1] = intersectCylinder(origin, rayDirection, vec3(0.0), vec3(0.0,1.0,0.0),
+                          floorRadius, inter[maxInterI-1], dist[maxInterI-1], Vs[maxInterI-1], 
+                          Ns[maxInterI-1], Ls[maxInterI-1]); 
   
   //Return if there was no interesection
   bool interBoolSol = true;
-  for (int i = 0; i < (1+noSpheres*2 + noCubes*2); i++){
+  for (int i = 0; i < (maxInterI); i++){
     interBoolSol = interBoolSol && !interBool[i];
   }if(interBoolSol){
     return false;
@@ -459,17 +599,32 @@ bool intersectSomething(vec3 origin, vec3 rayDirection, out vec3 intersection,
 
   //Set pixel colour
   float minDist = 1000.0;
-  for (int i = 0; i < (1+noSpheres*2 + noCubes*2); i++){
+  for (int i = 0; i < (maxInterI); i++){
     if(interBool[i] && (minDist > dist[i])){
       intersection = inter[i]+0.0001; //Prevention of self intersection
       N = Ns[i];
       //Floor case
       if(i==0){
         color = reflectedColor;
+        float shadArea = 5.0;
+        float distCenter = length(intersection);
+        if(distCenter > floorRadius - shadArea){
+          float transf = floorRadius - distCenter;
+          color = (color * transf * 0.13) + 0.2;
+        }
         isFloor = true;
+        isBack = false;
+      }//Background case
+      else if(i==maxInterI-1){
+        color = vec3(0.3);
+        if(intersection.y < 3.0){
+          color = (color * intersection.y * 0.11) + 0.2;
+        }
+        isBack = true;
+        isFloor = false;
       }else{
         isFloor = false;
-        
+        isBack = false;
         if(mode == 0){
           //Perlin grid
           float noise = get_nearest_noise(intersection, 0.0, transPerlin, scalePerlin, anglePerlin);
@@ -514,7 +669,7 @@ bool intersectSomething(vec3 origin, vec3 rayDirection, out vec3 intersection,
           noise = trilinearNoise(intersection, -1.0, transPerlin1, scalePerlin1, anglePerlin1);
           color += 1.0 - (vec3(noise)*weightPerlin2 + brightPerlin2);
 
-          noise = trilinearNoise(intersection, -1.0, transPerlin2, scalePerlin2, anglePerlin2);
+          noise = trilinearNoise(intersection, 0.0, transPerlin2, scalePerlin2, anglePerlin2);
           color += 1.0 - (vec3(noise)*weightPerlin3 + brightPerlin3);
 
           color = (color/3.0);
@@ -525,6 +680,15 @@ bool intersectSomething(vec3 origin, vec3 rayDirection, out vec3 intersection,
     
   }
   
+  vec3 hitToLight = lightPos - intersection;
+	vec3 lightDirection = normalize(hitToLight);
+
+  float diff_term_float = min(max(0.0, dot(lightDirection, N) / 2.0 +0.4),1.0);
+  vec3 diffuse_term = diff_term_float * vec3(1.0);
+  diffuse_term = (diffuse_term * vec3(0.8,0.8,0.7)) + vec3(0.2,0.2,0.3);
+
+  color = color * diffuse_term;
+
   //Set shadow
   if (intersectSomethingGoingToLight(intersection, N)) {
     color = 0.5*color;
@@ -532,6 +696,8 @@ bool intersectSomething(vec3 origin, vec3 rayDirection, out vec3 intersection,
     return true;
   }
   shadow = false;
+
+  
 
   return true;
 }
@@ -570,11 +736,11 @@ void main() {
   vec3 color, tempColor, colorMax, reflectedColor;
   vec3 N;
   bool shadow = false;
-  bool isFloor;
+  bool isFloor, isBack;
 
   //RAytracing algorithm
   if (intersectSomething(cameraPosition, rayDirection, intersection1, N, color, reflectedColor,\
-     shadow, isFloor)) {
+     shadow, isFloor, isBack)) {
     color += 0.3*tempColor ;
     rayDirection = reflect(rayDirection, N);
 
@@ -582,8 +748,8 @@ void main() {
       isFloor = true;
     }
 
-    if (isFloor && intersectSomething(intersection1, rayDirection, intersection2, N, tempColor, \
-        reflectedColor, shadow, isFloor)) {
+    if (isFloor && !isBack && intersectSomething(intersection1, rayDirection, intersection2, N, tempColor, \
+        reflectedColor, shadow, isFloor, isBack)) {
       color += 0.3*tempColor ;
       rayDirection = reflect(rayDirection, N);
 
@@ -591,8 +757,8 @@ void main() {
         isFloor = true;
       }
 
-      if (isFloor && intersectSomething(intersection2, rayDirection, intersection1, N, tempColor, \
-            reflectedColor, shadow, isFloor)) {
+      if (isFloor && !isBack && intersectSomething(intersection2, rayDirection, intersection1, N, tempColor, \
+            reflectedColor, shadow, isFloor, isBack)) {
         color += 0.3*tempColor ;
       }
     }
