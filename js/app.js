@@ -369,12 +369,6 @@ function initDemo() {
       }
     }
 
-    //Floor grid
-    var grid = document.getElementById("gridCheck").checked
-    if(grid != prevGrid){
-      gl.uniform1i(gridOn, grid)
-    }
-    prevGrid = grid
 
     //Reflection on
     var reflection = document.getElementById("reflectionCheck").checked
