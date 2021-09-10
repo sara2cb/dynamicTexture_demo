@@ -383,7 +383,9 @@ function initDemo() {
     var diry = parseFloat(document.getElementById("diry").value);
     var dirz = parseFloat(document.getElementById("dirz").value);
     if(dirx != NaN && diry != NaN && dirz != NaN ){
-      gl.uniform3f(planeDirectionLocation, dirx, diry, dirz);
+      var mgnt = Math.sqrt(dirx*dirx + diry*diry + dirz*dirz)
+
+      gl.uniform3f(planeDirectionLocation, dirx/mgnt, diry/mgnt, dirz/mgnt);
     }
 
     //Perlin scale parameters

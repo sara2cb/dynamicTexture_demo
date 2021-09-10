@@ -509,6 +509,7 @@ bool intersectSomethingGoingToLight(vec3 origin, vec3 N_aux) {
   float dist, distBef;
   vec3 V, N, L;
 
+  
   for(int i; i < noCubes; i++){
     bool interCube = intersectCube(origin, rayDirection, i, intersection, distBef, V,N,L) && \
                 !frontPlane(intersection, cubeCenter[i], norPlane);
@@ -616,6 +617,7 @@ bool intersectSomething(vec3 origin, vec3 rayDirection, out vec3 intersection,
         isBack = false;
       }//Background case
       else if(i==maxInterI-1){
+        
         color = vec3(0.3);
         if(intersection.y < 3.0){
           color = (color * intersection.y * 0.11) + 0.2;
